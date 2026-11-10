@@ -1,0 +1,51 @@
+// Pinos e parâmetros do firmware. Tudo que depende do hardware fica aqui.
+#pragma once
+
+#include "driver/gpio.h"
+
+// ---------------------------------------------------------------- pinos
+#define PIN_STEP     GPIO_NUM_25
+#define PIN_DIR      GPIO_NUM_26
+#define PIN_EN       GPIO_NUM_27   // DRV8825 nENABLE: 0 = driver ligado
+#define PIN_FLT      GPIO_NUM_34   // DRV8825 nFAULT: 0 = falha (só entrada, SEM pull-up interno)
+#define PIN_M0       GPIO_NUM_32
+#define PIN_M1       GPIO_NUM_33
+#define PIN_M2       GPIO_NUM_13
+#define PIN_FIM_NEG  GPIO_NUM_18   // fim de curso do lado theta1 < 0
+#define PIN_FIM_POS  GPIO_NUM_19   // fim de curso do lado theta1 > 0
+#define PIN_SDA      GPIO_NUM_21
+#define PIN_SCL      GPIO_NUM_22
+// SLP = RST = 3,3 V (sempre acordado). VP (GPIO36) não é usado.
+
+// ---------------------------------------------------------------- serial
+#define SERIAL_BAUD      921600
+#define SERIAL_LINHA_MAX 64
+
+// ---------------------------------------------------------------- motor
+#define MOTOR_PASSOS_VOLTA 200      // passos inteiros por volta
+#define MICROPASSO         16       // 1, 2, 4, 8, 16 ou 32 (pinos M0..M2)
+#define REDUCAO            1.0f     // voltas do motor por volta do braço
+#define DIR_SINAL          1        // -1 inverte o sentido positivo de theta1
+#define PASSO_ISR_HZ       40000    // taxa do gerador de passos (máx. PASSO_ISR_HZ/2 passos/s)
+#define V_MAX              25.0f    // rad/s, saturação da velocidade do braço
+#define A_MAX              300.0f   // rad/s², saturação do comando e frenagem nos limites
+
+// ---------------------------------------------------------------- fins de curso
+#define FIM_NIVEL_ATIVO    0        // pull-up interno; a chave fecha para GND
+#define FIM_DEBOUNCE_MS    3
+#define FIM_MARGEM_RAD     0.15f    // limite de software = meio curso - margem
+#define HOMING_V           1.5f     // rad/s
+#define HOMING_A           10.0f    // rad/s²
+#define HOMING_CURSO_MAX   7.0f     // rad: desiste se não achar a chave nesse curso
+#define LIM_SEM_HOMING_RAD 0.5f     // limite de software quando a origem é definida com 'O'
+
+// ---------------------------------------------------------------- encoder
+#define ENC_SINAL          1        // -1 inverte o sentido de theta2
+#define ENC_I2C_HZ         400000
+#define ENC_BANDA_VEL_HZ   40.0f    // banda do observador de velocidade de theta2
+#define ENC_ERROS_MAX      20       // leituras I2C seguidas com erro até entrar em falha
+
+// ---------------------------------------------------------------- malha interna
+#define CTRL_HZ            1000
+#define WATCHDOG_MS        200      // sem comando por esse tempo: freia até parar
+#define USA_PINO_FALHA     1        // 0 se o nFAULT não tiver pull-up externo

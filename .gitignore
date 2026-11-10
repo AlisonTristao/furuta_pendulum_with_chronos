@@ -1,0 +1,15 @@
+# PlatformIO / ESP-IDF
+firmware/.pio/
+firmware/.vscode/
+firmware/sdkconfig.*
+!firmware/sdkconfig.defaults
+firmware/managed_components/
+firmware/dependencies.lock
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Resultados dos ensaios
+host/ensaios/
