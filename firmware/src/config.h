@@ -31,7 +31,8 @@
 #define A_MAX              300.0f   // rad/s², saturação do comando e frenagem nos limites
 
 // ---------------------------------------------------------------- fins de curso
-#define FIM_NIVEL_ATIVO    0        // pull-up interno; a chave fecha para GND
+#define FIM_NIVEL_ATIVO    1        // solta = 0, apertada = 1 (fio solto lê 1 = acionado: seguro)
+#define FIM_PULL_UP        1        // pull-up interno nos dois pinos
 #define FIM_DEBOUNCE_MS    3
 #define FIM_MARGEM_RAD     0.15f    // limite de software = meio curso - margem
 #define HOMING_V           1.5f     // rad/s

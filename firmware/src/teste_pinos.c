@@ -160,8 +160,8 @@ void teste_pinos(void)
     gpio_config_t in = {
         .pin_bit_mask = (1ULL << PIN_FIM_NEG) | (1ULL << PIN_FIM_POS),
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = FIM_NIVEL_ATIVO == 0,
-        .pull_down_en = FIM_NIVEL_ATIVO != 0,
+        .pull_up_en = FIM_PULL_UP,
+        .pull_down_en = !FIM_PULL_UP,
     };
     gpio_config(&in);
     gpio_config_t flt = {.pin_bit_mask = 1ULL << PIN_FLT, .mode = GPIO_MODE_INPUT};
