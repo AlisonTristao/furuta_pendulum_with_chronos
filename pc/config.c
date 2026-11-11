@@ -83,6 +83,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "theta1_degrau", c->e.theta1_degrau) NUM("ensaio", "margem_theta1", c->e.margem_theta1)
     INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
+    NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;
         c->e.equilibrio = !strcmp(v, "equilibrio");
@@ -95,6 +96,8 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
 
     NUM("sim", "t_disturbio", c->e.t_disturbio) NUM("sim", "u_disturbio", c->e.u_disturbio)
     NUM("sim", "dur_disturbio", c->e.dur_disturbio) NUM("sim", "tc2", c->e.tc2) INT("sim", "rk4_sub", c->e.rk4_sub)
+    INT("sim", "planta_acel", c->e.planta_acel) NUM("sim", "obs_hz", c->e.obs_hz)
+    NUM("sim", "atraso_ms", c->e.atraso_ms) INT("sim", "bits_enc", c->e.bits_enc)
     if (!strcmp(sec, "sim") && !strcmp(k, "x0")) return lista(v, c->e.x0, 4) == 4 ? 0 : -1;
 #undef NUM
 #undef INT

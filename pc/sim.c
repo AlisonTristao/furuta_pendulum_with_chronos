@@ -36,6 +36,14 @@ int main(int argc, char **argv)
     planta.tc2 = e->tc2;
     if (e->tc2 > 0) printf("planta com atrito seco tc2 = %g N·m (o MPC não modela)\n", e->tc2);
     double x[4] = {e->x0[0], e->x0[1], e->x0[2], e->x0[3]};
+    double a_cmd = 0;                             /* último comando enviado */
+    double xm[4] = {x[0], x[1], x[2], x[3]};      /* o que o controle vê */
+    double th_est = x[1], w_est = x[3], fila[256] = {0};   /* fila: comando por ms (atraso) */
+    long tms = 0;   /* observador de θ2 (como no firmware, 1 kHz) */
+    double q = e->bits_enc > 0 ? 2 * PI / (1 << e->bits_enc) : 0;
+    if (e->planta_acel)
+        printf("planta comandada em aceleração | observador %g Hz | atraso %g ms | encoder %d bits\n", e->obs_hz,
+               e->atraso_ms, e->bits_enc);
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
     FILE *out = argc > 2 ? fopen(argv[2], "w") : NULL;
     if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms\n");
@@ -48,9 +56,12 @@ int main(int argc, char **argv)
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
         double t0 = periodo_agora();
-        double u = mpc_passo(c, x, ref, &in);
+        double xc[4] = {xm[0], xm[1], xm[2], xm[3]};   /* compensação do atraso */
+        if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
+        double u = mpc_passo(c, xc, ref, &in);
         double tc = (periodo_agora() - t0) * 1e3;
-        double a = modelo_acel_braco(&m, x, u);
+        double a = modelo_acel_braco(&m, xc, u);
+        a_cmd = a;
         soma_tc += tc;
         max_tc = fmax(max_tc, tc);
         soma_qp += in.n_qp;
@@ -64,7 +75,28 @@ int main(int argc, char **argv)
             break;
         }
         double ud = u + (t >= e->t_disturbio && t < e->t_disturbio + e->dur_disturbio ? e->u_disturbio : 0);
-        modelo_passo(&planta, x, ud, e->rk4_sub);
+        if (!e->planta_acel) {
+            modelo_passo(&planta, x, ud, e->rk4_sub);
+            for (int i = 0; i < 4; i++) xm[i] = x[i];
+            continue;
+        }
+        /* 1 ms por vez: o comando novo entra após atraso_ms; o firmware lê o encoder e atualiza o observador */
+        double ad = a + (ud - u) * 200;           /* distúrbio de torque ~ em aceleração (aprox.) */
+        int nms = (int)lround(e->Ts * 1e3), nat = (int)lround(e->atraso_ms);
+        if (nat > 200) nat = 200;
+        for (int j = 0; j < nms; j++) fila[(tms + nat + j) & 255] = ad;
+        for (int j = 0; j < nms; j++) {
+            modelo_passo_acel(&planta, x, fila[tms++ & 255], 1e-3, 1);
+            double med = q > 0 ? q * floor(x[1] / q) : x[1];
+            if (e->obs_hz > 0) {
+                double wn = 2 * PI * e->obs_hz, er = med - th_est;
+                th_est += 1e-3 * (w_est + 2 * wn * er);
+                w_est += 1e-3 * wn * wn * er;
+            } else {
+                w_est = x[3];
+            }
+            xm[0] = x[0], xm[1] = med, xm[2] = x[2], xm[3] = w_est;
+        }
     }
     printf("passos %d | swing-up (|θ2| < 0,1 rad) em %.2f s | x final = (%.3f, %.3f, %.3f, %.3f)\n", k, t_up, x[0],
            x[1], x[2], x[3]);

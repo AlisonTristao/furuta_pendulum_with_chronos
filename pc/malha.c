@@ -5,7 +5,7 @@
  * Sequência: conecta -> pêndulo parado embaixo, Enter: zera θ2 (Z) -> Enter: homing (H; o limite de θ1 do MPC vem
  * daqui) -> espera a condição de partida mandando aceleração 0 (modo swingup: pêndulo parado embaixo por 1 s; modo
  * equilibrio: você leva o pêndulo até |θ2| < janela_equilibrio) -> laço de Ts. A cada período: X (lê o estado), MPC
- * (torque u), u -> θ̈1 pelo modelo, envia θ̈1. Termina no fim da duração, no Ctrl+C ou em qualquer erro: para de
+ * (torque u) no estado predito comp_atraso_ms à frente com o último comando, u -> θ̈1 pelo modelo, envia θ̈1. Termina no fim da duração, no Ctrl+C ou em qualquer erro: para de
  * mandar comandos (o firmware freia o braço em 200 ms) e desliga o driver (E0).
  *
  * CSV: t, θ1, θ2, dθ1, dθ2, θ1_ref, u, a, n_qp, n_it, dP, t_calc_ms (MPC), t_ciclo_ms (X até a resposta do envio),
@@ -186,6 +186,7 @@ int main(int argc, char **argv)
     int K = (int)lround(e->duracao / e->Ts), k, estouros = 0;
     double soma_calc = 0, max_calc = 0, soma_ciclo = 0, max_ciclo = 0, max_atraso = 0;
     const char *motivo = "fim da duração";
+    double a_cmd = 0;                                  /* último comando enviado (em espera foi 0) */
     double t0 = periodo_agora();
     for (k = 0; k < K && !g_parar; k++) {
         double atraso = periodo_espera(p) * 1e3;
@@ -200,13 +201,16 @@ int main(int argc, char **argv)
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
         double tc0 = periodo_agora();
-        double u = mpc_passo(c, x, ref, &in);
+        double xc[4] = {x[0], x[1], x[2], x[3]};    /* compensação do atraso: estado daqui a comp_atraso_ms */
+        if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
+        double u = mpc_passo(c, xc, ref, &in);
         double tcalc = (periodo_agora() - tc0) * 1e3;
         if (!in.finito) {
             motivo = "controle não finito";
             break;
         }
-        double a = modelo_acel_braco(&m, x, u);
+        double a = modelo_acel_braco(&m, xc, u);
+        a_cmd = a;
         double xa[4];
         st = furuta_acel(f, a, xa, 10);
         double tciclo = (periodo_agora() - ti) * 1e3;

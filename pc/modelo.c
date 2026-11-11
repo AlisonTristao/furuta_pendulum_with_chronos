@@ -56,6 +56,31 @@ void modelo_passo(const modelo *m, double x[4], double u, int nsub)
     }
 }
 
+static void ode_acel(const modelo *m, const double x[4], double a, double dx[4])
+{
+    double s = sin(x[1]), c = cos(x[1]), d1 = x[2], d2 = x[3];
+    double r2 = -m->mu2 * d2 + 0.5 * m->beta * d1 * d1 * sin(2 * x[1]) + m->eta * s - m->tc2 * tanh(d2 / 0.01);
+    dx[0] = d1;
+    dx[1] = d2;
+    dx[2] = a;
+    dx[3] = (r2 - m->gamma * c * a) / m->delta;
+}
+
+void modelo_passo_acel(const modelo *m, double x[4], double a, double h0, int nsub)
+{
+    double h = h0 / nsub, k1[4], k2[4], k3[4], k4[4], t[4];
+    for (int n = 0; n < nsub; n++) {
+        ode_acel(m, x, a, k1);
+        for (int i = 0; i < 4; i++) t[i] = x[i] + h / 2 * k1[i];
+        ode_acel(m, t, a, k2);
+        for (int i = 0; i < 4; i++) t[i] = x[i] + h / 2 * k2[i];
+        ode_acel(m, t, a, k3);
+        for (int i = 0; i < 4; i++) t[i] = x[i] + h * k3[i];
+        ode_acel(m, t, a, k4);
+        for (int i = 0; i < 4; i++) x[i] += h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+    }
+}
+
 static double sinc(double th)
 {
     if (fabs(th) < 1e-4) {

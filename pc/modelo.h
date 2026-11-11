@@ -22,6 +22,8 @@ void modelo_ode(const modelo *m, const double x[4], double u, double dx[4]);
 double modelo_acel_braco(const modelo *m, const double x[4], double u);
 /* Planta: RK4 com nsub subpassos em Ts, u constante. */
 void modelo_passo(const modelo *m, double x[4], double u, int nsub);
+/* Planta como no hardware: o motor impõe θ̈1 = a (constante) e o pêndulo responde. RK4 com nsub subpassos em h. */
+void modelo_passo_acel(const modelo *m, double x[4], double a, double h, int nsub);
 
 /* ρ = f_ρ(x) (8, eq. 12), na escala de Ts (ρ·Ts), com dθ saturadas em ±vmax. */
 void modelo_rho(const modelo *m, const double x[4], double r[8]);

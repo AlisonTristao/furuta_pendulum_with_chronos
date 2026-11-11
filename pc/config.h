@@ -12,11 +12,16 @@ typedef struct {
     double x0[4];                                 /* só na simulação */
     int rk4_sub;                                  /* só na simulação: subpassos da planta */
     double tc2;                                   /* só na simulação: atrito seco do pêndulo [N·m] */
+    int planta_acel;                              /* só na simulação: 1 = planta comandada em θ̈1, como o hardware */
+    double obs_hz;                                /* só na simulação: dθ2 pelo observador do firmware (0 = ideal) */
+    double atraso_ms;                             /* só na simulação: atraso entre a leitura e o novo comando */
+    int bits_enc;                                 /* só na simulação: quantização de θ2 (0 = ideal) */
     char porta[32];
     double margem_theta1;                         /* restrição de θ1 do MPC = ±(limite do homing − margem) */
     int usa_limite_homing;                        /* 1: θ1_min/max do MPC vêm do homing */
     double theta2_aborta;                         /* encerra se |dθ2| passar disso (rad/s) */
     int equilibrio;                               /* modo = equilibrio: o controle só assume perto do topo */
+    double comp_atraso_ms;                        /* prediz o estado este tempo à frente (com o último comando) antes do MPC */
     double janela_equilibrio;                     /* |θ2| (rad) em que o modo equilíbrio assume */
 } ensaio;
 
