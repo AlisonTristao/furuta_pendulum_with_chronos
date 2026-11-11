@@ -75,10 +75,9 @@ def grafico(arq, saida):
     plt.rcParams.update({"font.size": 10, "axes.edgecolor": GRADE, "axes.labelcolor": TEXTO2,
                          "xtick.color": TEXTO2, "ytick.color": TEXTO2, "text.color": TEXTO})
     fig, ax = plt.subplots(3, 1, figsize=(10, 7.5), sharex=True, facecolor=FUNDO)
-    w = np.degrees(D["w"])
-    w[1:][np.abs(np.diff(w)) > 180] = np.nan        # não liga ±180° quando o pêndulo passa por baixo
+    w = np.degrees(D["theta2"])                      # contínuo (sem dobrar em ±180°): topo em 0 ou ±360
     paineis = [
-        (w, "Ângulo do pêndulo θ2 (graus, 0 = topo)"),
+        (w, "Ângulo do pêndulo θ2 (graus; 0 e ±360 = topo, ±180 = embaixo)"),
         (D["theta1"], "Ângulo do braço θ1 (rad)"),
         (D["a"], "Aceleração comandada do braço (rad/s²)"),
     ]
@@ -92,7 +91,8 @@ def grafico(arq, saida):
             a.spines[s].set_visible(False)
         if M:
             a.axvline(M["subida"], color=TEXTO2, lw=0.8, ls="--")
-    ax[0].set_yticks([-180, -90, 0, 90, 180])
+    ax[0].set_ylim(-360, 360)
+    ax[0].set_yticks(np.arange(-360, 361, 90))
     for v in (1.46, -1.46):
         ax[1].axhline(v, color=TEXTO2, lw=0.8, ls=":")
     ax[1].text(t[-1], 1.46, "limite de θ1 do MPC ", va="bottom", ha="right", fontsize=8, color=TEXTO2)
