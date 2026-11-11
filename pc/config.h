@@ -34,5 +34,9 @@ typedef struct {
 /* Lê o arquivo (NULL = só padrões). Devolve 0 se ok; imprime chaves desconhecidas em stderr. */
 int config_le(const char *arquivo, config *c);
 void config_imprime(const config *c);
+/* "secao.chave=valor" da linha de comando (ex.: mpc.u_max=1.25). Devolve 0 se ok. */
+int config_arg(config *c, const char *arg);
+/* Lê o .ini e aplica os argumentos com '=' a partir de argv[2]; os outros vão para *livre (o 1º). */
+int config_le_args(int argc, char **argv, config *c, const char **livre);
 
 #endif

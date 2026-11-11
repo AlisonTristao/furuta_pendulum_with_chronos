@@ -1,6 +1,7 @@
 /* Malha fechada no pêndulo real: o PC roda o NMPC qLPV (CHRONOS em C) e o ESP32 é a interface com o hardware.
  *
- *   malha.exe <config.ini> [saida.csv]      (padrão: ensaios/ensaio_AAAAMMDD_HHMMSS.csv)
+ *   malha.exe <config.ini> [saida.csv] [secao.chave=valor ...]   (padrão: ensaios/ensaio_AAAAMMDD_HHMMSS.csv)
+ *   ex.: malha.exe furuta.ini ensaio.modo=swingup ensaio.duracao=20
  *
  * Sequência: conecta -> pêndulo parado embaixo, Enter: zera θ2 (Z) -> Enter: homing (H; o limite de θ1 do MPC vem
  * daqui) -> espera a condição de partida mandando aceleração 0 (modo swingup: pêndulo parado embaixo por 1 s; modo
@@ -74,16 +75,17 @@ int main(int argc, char **argv)
     SetConsoleOutputCP(65001);   /* acentos no console */
 #endif
     if (argc < 2) {
-        fprintf(stderr, "uso: %s <config.ini> [saida.csv]\n", argv[0]);
+        fprintf(stderr, "uso: %s <config.ini> [saida.csv] [secao.chave=valor ...]\n", argv[0]);
         return 2;
     }
     config cfg;
-    if (config_le(argv[1], &cfg)) return 1;
+    const char *livre;
+    if (config_le_args(argc, argv, &cfg, &livre)) return 1;
     const ensaio *e = &cfg.e;
 
     char arq[256];
-    if (argc > 2) {
-        snprintf(arq, sizeof(arq), "%s", argv[2]);
+    if (livre) {
+        snprintf(arq, sizeof(arq), "%s", livre);
     } else {
         time_t agora = time(NULL);
         char data[32];

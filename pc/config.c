@@ -161,6 +161,38 @@ int config_le(const char *arquivo, config *c)
     return erros ? -1 : 0;
 }
 
+int config_arg(config *c, const char *arg)
+{
+    char b[160];
+    snprintf(b, sizeof(b), "%s", arg);
+    char *ig = strchr(b, '='), *pt = strchr(b, '.');
+    if (!ig || !pt || pt > ig) {
+        fprintf(stderr, "argumento inválido: %s (use secao.chave=valor)\n", arg);
+        return -1;
+    }
+    *ig = *pt = '\0';
+    if (aplica(c, apara(b), apara(pt + 1), apara(ig + 1))) {
+        fprintf(stderr, "chave desconhecida ou valor inválido: %s\n", arg);
+        return -1;
+    }
+    return 0;
+}
+
+int config_le_args(int argc, char **argv, config *c, const char **livre)
+{
+    if (config_le(argv[1], c)) return -1;
+    *livre = NULL;
+    for (int i = 2; i < argc; i++) {
+        if (strchr(argv[i], '=')) {
+            if (config_arg(c, argv[i])) return -1;
+            printf("sobrescrito: %s\n", argv[i]);
+        } else if (!*livre) {
+            *livre = argv[i];
+        }
+    }
+    return 0;
+}
+
 void config_imprime(const config *c)
 {
     const fisico *f = &c->f;

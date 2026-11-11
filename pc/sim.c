@@ -24,11 +24,12 @@ int main(int argc, char **argv)
     SetConsoleOutputCP(65001);   /* acentos no console */
 #endif
     if (argc < 2) {
-        fprintf(stderr, "uso: %s <config.ini> [saida.csv]\n", argv[0]);
+        fprintf(stderr, "uso: %s <config.ini> [saida.csv] [secao.chave=valor ...]\n", argv[0]);
         return 2;
     }
     config cfg;
-    if (config_le(argv[1], &cfg)) return 1;
+    const char *livre;
+    if (config_le_args(argc, argv, &cfg, &livre)) return 1;
     config_imprime(&cfg);
     const ensaio *e = &cfg.e;
     modelo m = modelo_de_fisico(cfg.f, e->Ts, cfg.mpc.dtheta_max);
@@ -45,7 +46,7 @@ int main(int argc, char **argv)
         printf("planta comandada em aceleração | observador %g Hz | atraso %g ms | encoder %d bits\n", e->obs_hz,
                e->atraso_ms, e->bits_enc);
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
-    FILE *out = argc > 2 ? fopen(argv[2], "w") : NULL;
+    FILE *out = livre ? fopen(livre, "w") : NULL;
     if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms\n");
 
     int K = (int)lround(e->duracao / e->Ts);
