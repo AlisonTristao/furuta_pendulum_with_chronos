@@ -11,12 +11,18 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #define PI 3.14159265358979323846
 static double wrap(double a) { return a - 2 * PI * floor((a + PI) / (2 * PI)); }
 
 int main(int argc, char **argv)
 {
+#ifdef _WIN32
+    SetConsoleOutputCP(65001);   /* acentos no console */
+#endif
     if (argc < 2) {
         fprintf(stderr, "uso: %s <config.ini> [saida.csv]\n", argv[0]);
         return 2;

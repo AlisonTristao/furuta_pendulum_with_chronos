@@ -67,6 +67,9 @@ static void encerra(furuta *f)
 
 int main(int argc, char **argv)
 {
+#ifdef _WIN32
+    SetConsoleOutputCP(65001);   /* acentos no console */
+#endif
     if (argc < 2) {
         fprintf(stderr, "uso: %s <config.ini> [saida.csv]\n", argv[0]);
         return 2;
