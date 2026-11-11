@@ -1,0 +1,13 @@
+# arquivo,config  (ensaios de swing-up de 10/11/2026; todos com Ts 20 ms, Np 40, compensação de atraso)
+ensaios/ensaio_20261110_225233.csv,u ±1.25 · Rdu 300
+ensaios/ensaio_20261110_231114.csv,u ±0.9 · Rdu 300
+ensaios/ensaio_20261110_231227.csv,u ±0.75 · Rdu 300
+ensaios/ensaio_20261110_232430.csv,u ±0.75 · θ1 ±1.16 · Q1 30
+ensaios/ensaio_20261110_232520.csv,u ±0.75 · θ1 ±1.16 · Q1 30
+ensaios/ensaio_20261110_232618.csv,u ±0.75 · θ1 ±1.16 · Q1 30
+ensaios/ensaio_20261110_232717.csv,u ±0.75 · Rdu 300
+ensaios/ensaio_20261110_232806.csv,u ±0.75 · Rdu 300
+ensaios/ensaio_20261110_233446.csv,u ±0.75 · estimador · comp. 20 ms
+ensaios/ensaio_20261110_233534.csv,u ±0.75 · estimador · comp. 20 ms
+ensaios/ensaio_20261110_233652.csv,u ±0.75 · estimador · comp. 10 ms
+ensaios/ensaio_20261110_233745.csv,u ±0.75 · estimador · comp. 10 ms
