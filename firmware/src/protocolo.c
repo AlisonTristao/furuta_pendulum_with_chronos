@@ -2,6 +2,7 @@
 //
 //   <a>   aceleração do braço [rad/s²]   -> "t1,t2,dt1,dt2"   (ou "ERR,<estado>" fora de READY/RUN)
 //   H     homing                          -> "OK,<meio_curso>,<limite>" | "ERR,<motivo>"
+//   X     só lê o estado                  -> "t1,t2,dt1,dt2"   (amostra no início do período)
 //   O     origem aqui, sem homing         -> "OK,<meio_curso>,<limite>"
 //   Z     pêndulo parado embaixo: t2 = pi -> "OK"
 //   S     estado                          -> "S,<estado>,<erro>,<encoder>,<fim_neg>,<fim_pos>,<flt>"
@@ -77,6 +78,12 @@ static void executa(char *linha)
         if (controle_estado() == EST_PRONTO) responde_curso();
         else envia("ERR,%s", controle_estado_nome(controle_estado()));
         break;
+    case 'X': {                              // só lê o estado (não mexe no comando nem no watchdog)
+        leitura_t x;
+        controle_leitura(&x);
+        envia("%.5f,%.5f,%.4f,%.4f", x.t1, x.t2, x.dt1, x.dt2);
+        break;
+    }
     case 'Z':
         controle_zera_pendulo();
         envia("OK");
