@@ -6,7 +6,7 @@ ifeq ($(OS),Windows_NT)
 LDLIBS += -lwinmm
 endif
 
-NUCLEO = qlpv_mpc.c modelo.c chronos.c config.c periodo.c
+NUCLEO = estimador.c qlpv_mpc.c modelo.c chronos.c config.c periodo.c
 
 all: sim.exe malha.exe ident.exe
 

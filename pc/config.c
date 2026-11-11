@@ -24,6 +24,8 @@ static void padroes(config *c)
     e.usa_limite_homing = 1;
     e.theta2_aborta = 60;
     e.janela_equilibrio = 0.15;
+    e.est_L1 = 0.5;
+    e.est_L2 = 20;
     c->e = e;
 }
 
@@ -85,6 +87,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "theta1_degrau", c->e.theta1_degrau) NUM("ensaio", "margem_theta1", c->e.margem_theta1)
     INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
+    INT("ensaio", "estimador", c->e.estimador) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
     NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) NUM("ensaio", "troca_equilibrio", c->e.troca_equilibrio)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;

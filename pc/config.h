@@ -22,6 +22,8 @@ typedef struct {
     double theta2_aborta;                         /* encerra se |dθ2| passar disso (rad/s) */
     int equilibrio;                               /* modo = equilibrio: o controle só assume perto do topo */
     double comp_atraso_ms;                        /* prediz o estado este tempo à frente (com o último comando) antes do MPC */
+    int estimador;                                /* 1: dθ2 pelo estimador com modelo no PC (estimador.h) */
+    double est_L1, est_L2;
     double troca_equilibrio;                      /* |θ2| (rad) em que passa ao controle de equilíbrio (volta em 2×) */
     double janela_equilibrio;                     /* |θ2| (rad) em que o modo equilíbrio assume */
 } ensaio;

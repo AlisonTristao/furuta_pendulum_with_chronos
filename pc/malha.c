@@ -12,6 +12,7 @@
  * CSV: t, θ1, θ2, dθ1, dθ2, θ1_ref, u, a, n_qp, n_it, dP, t_calc_ms (MPC), t_ciclo_ms (X até a resposta do envio),
  *      atraso_ms (início do período em relação ao instante ideal) */
 #include "config.h"
+#include "estimador.h"
 #include "furuta_serial.h"
 #include "modelo.h"
 #include "periodo.h"
@@ -192,6 +193,8 @@ int main(int argc, char **argv)
     int K = (int)lround(e->duracao / e->Ts), k, estouros = 0;
     double soma_calc = 0, max_calc = 0, soma_ciclo = 0, max_ciclo = 0, max_atraso = 0;
     const char *motivo = "fim da duração";
+    estimador est;
+    estimador_cria(&est, e->est_L1, e->est_L2);
     double a_cmd = 0;                                  /* último comando enviado (em espera foi 0) */
     double t0 = periodo_agora();
     for (k = 0; k < K && !g_parar; k++) {
@@ -204,6 +207,7 @@ int main(int argc, char **argv)
             break;
         }
         x[1] -= off2;
+        if (e->estimador) estimador_passo(&est, &m, x, a_cmd, e->Ts);   /* x[3] passa a ser o estimado */
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
         double tc0 = periodo_agora();

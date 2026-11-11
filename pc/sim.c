@@ -4,6 +4,7 @@
  *
  * CSV: t, θ1, θ2, dθ1, dθ2, θ1_ref, u (torque), a (θ̈1 que o motor imporia), n_qp, n_it, dP, t_calc_ms */
 #include "config.h"
+#include "estimador.h"
 #include "modelo.h"
 #include "periodo.h"
 #include "qlpv_mpc.h"
@@ -37,6 +38,8 @@ int main(int argc, char **argv)
     planta.tc2 = e->tc2;
     if (e->tc2 > 0) printf("planta com atrito seco tc2 = %g N·m (o MPC não modela)\n", e->tc2);
     double x[4] = {e->x0[0], e->x0[1], e->x0[2], e->x0[3]};
+    estimador est;
+    estimador_cria(&est, e->est_L1, e->est_L2);
     double a_cmd = 0;                             /* último comando enviado */
     double xm[4] = {x[0], x[1], x[2], x[3]};      /* o que o controle vê */
     double th_est = x[1], w_est = x[3], fila[256] = {0};   /* fila: comando por ms (atraso) */
@@ -60,6 +63,7 @@ int main(int argc, char **argv)
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
         double t0 = periodo_agora();
+        if (e->estimador) estimador_passo(&est, &m, xm, a_cmd, e->Ts);
         double xc[4] = {xm[0], xm[1], xm[2], xm[3]};   /* compensação do atraso */
         if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
         if (troca) {                                  /* swing-up <-> equilíbrio, com histerese */
