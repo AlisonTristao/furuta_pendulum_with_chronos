@@ -11,6 +11,7 @@ static void padroes(config *c)
     c->f = (fisico){.m2 = 0.270 / 3, .L1 = 0.170 / 2, .l2 = 0.130, .I1 = 0.005, .I2 = 5.07e-4,
                     .mu1 = 0.001, .mu2 = 0.001, .g = 9.81};
     c->mpc = mpc_config_artigo();
+    c->u_max_eq = c->Rdu_eq = 0;
     ensaio e = {0};
     e.Ts = 0.02;
     e.duracao = 10;
