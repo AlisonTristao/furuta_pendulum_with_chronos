@@ -13,3 +13,8 @@ __pycache__/
 
 # Resultados dos ensaios
 host/ensaios/
+
+# PC
+pc/*.exe
+pc/*.csv
+pc/ensaios/

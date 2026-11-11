@@ -1,0 +1,143 @@
+#include "config.h"
+
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static void padroes(config *c)
+{
+    /* pêndulo do artigo (ICIT 27) */
+    c->f = (fisico){.m2 = 0.270 / 3, .L1 = 0.170 / 2, .l2 = 0.130, .I1 = 0.005, .I2 = 5.07e-4,
+                    .mu1 = 0.001, .mu2 = 0.001, .g = 9.81};
+    c->mpc = mpc_config_artigo();
+    ensaio e = {0};
+    e.Ts = 0.02;
+    e.duracao = 10;
+    e.t_degrau = 1e9;
+    e.t_disturbio = 1e9;
+    e.x0[1] = 3.14159265358979;
+    e.rk4_sub = 10;
+    strcpy(e.porta, "COM7");
+    e.margem_theta1 = 0.0;
+    e.usa_limite_homing = 1;
+    e.theta2_aborta = 60;
+    c->e = e;
+}
+
+static char *apara(char *s)
+{
+    while (isspace((unsigned char)*s)) s++;
+    char *f = s + strlen(s);
+    while (f > s && isspace((unsigned char)f[-1])) *--f = '\0';
+    return s;
+}
+
+/* "a, b, c" -> até n números */
+static int lista(const char *v, double *out, int n)
+{
+    int k = 0;
+    char *p = (char *)v, *fim;
+    while (k < n) {
+        out[k] = strtod(p, &fim);
+        if (fim == p) break;
+        k++;
+        p = fim;
+        while (*p == ',' || isspace((unsigned char)*p)) p++;
+    }
+    return k;
+}
+
+static int aplica(config *c, const char *sec, const char *k, const char *v)
+{
+    double d = atof(v);
+#define NUM(S, K, DST)                                    \
+    if (!strcmp(sec, S) && !strcmp(k, K)) {               \
+        DST = d;                                          \
+        return 0;                                         \
+    }
+#define INT(S, K, DST)                                    \
+    if (!strcmp(sec, S) && !strcmp(k, K)) {               \
+        DST = atoi(v);                                    \
+        return 0;                                         \
+    }
+    NUM("fisico", "m2", c->f.m2) NUM("fisico", "L1", c->f.L1) NUM("fisico", "l2", c->f.l2)
+    NUM("fisico", "I1", c->f.I1) NUM("fisico", "I2", c->f.I2) NUM("fisico", "mu1", c->f.mu1)
+    NUM("fisico", "mu2", c->f.mu2) NUM("fisico", "g", c->f.g)
+
+    INT("mpc", "Np", c->mpc.Np) NUM("mpc", "Rdu", c->mpc.Rdu)
+    NUM("mpc", "u_min", c->mpc.u_min) NUM("mpc", "u_max", c->mpc.u_max)
+    NUM("mpc", "du_min", c->mpc.du_min) NUM("mpc", "du_max", c->mpc.du_max)
+    NUM("mpc", "theta1_min", c->mpc.theta1_min) NUM("mpc", "theta1_max", c->mpc.theta1_max)
+    NUM("mpc", "dtheta_max", c->mpc.dtheta_max) NUM("mpc", "qv_theta1", c->mpc.qv_theta1)
+    NUM("mpc", "qv_dtheta", c->mpc.qv_dtheta) INT("mpc", "rho_avg", c->mpc.rho_avg)
+    INT("mpc", "terminal_dlqr", c->mpc.terminal_dlqr) NUM("mpc", "Ru_lqr", c->mpc.Ru_lqr)
+    INT("mpc", "l_max", c->mpc.l_max) NUM("mpc", "eps_rho", c->mpc.eps_rho)
+    INT("mpc", "max_iter", c->mpc.op.max_iter) NUM("mpc", "t_barreira", c->mpc.op.t)
+    NUM("mpc", "eps", c->mpc.op.eps)
+    if (!strcmp(sec, "mpc") && !strcmp(k, "Q")) return lista(v, c->mpc.Q, 4) == 4 ? 0 : -1;
+
+    NUM("ensaio", "Ts", c->e.Ts) NUM("ensaio", "duracao", c->e.duracao)
+    NUM("ensaio", "theta1_ref", c->e.theta1_ref) NUM("ensaio", "t_degrau", c->e.t_degrau)
+    NUM("ensaio", "theta1_degrau", c->e.theta1_degrau) NUM("ensaio", "margem_theta1", c->e.margem_theta1)
+    INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
+    if (!strcmp(sec, "ensaio") && !strcmp(k, "porta")) {
+        snprintf(c->e.porta, sizeof(c->e.porta), "%s", v);
+        return 0;
+    }
+
+    NUM("sim", "t_disturbio", c->e.t_disturbio) NUM("sim", "u_disturbio", c->e.u_disturbio)
+    NUM("sim", "dur_disturbio", c->e.dur_disturbio) INT("sim", "rk4_sub", c->e.rk4_sub)
+    if (!strcmp(sec, "sim") && !strcmp(k, "x0")) return lista(v, c->e.x0, 4) == 4 ? 0 : -1;
+#undef NUM
+#undef INT
+    return -1;
+}
+
+int config_le(const char *arquivo, config *c)
+{
+    padroes(c);
+    if (!arquivo) return 0;
+    FILE *fp = fopen(arquivo, "r");
+    if (!fp) {
+        fprintf(stderr, "não abriu %s\n", arquivo);
+        return -1;
+    }
+    char linha[256], sec[32] = "";
+    int erros = 0;
+    while (fgets(linha, sizeof(linha), fp)) {
+        char *p = strpbrk(linha, ";#");
+        if (p) *p = '\0';
+        p = apara(linha);
+        if (!*p) continue;
+        if (*p == '[') {
+            char *f = strchr(p, ']');
+            if (f) *f = '\0';
+            snprintf(sec, sizeof(sec), "%s", apara(p + 1));
+            continue;
+        }
+        char *ig = strchr(p, '=');
+        if (!ig) continue;
+        *ig = '\0';
+        char *k = apara(p), *v = apara(ig + 1);
+        if (aplica(c, sec, k, v)) {
+            fprintf(stderr, "%s: chave desconhecida ou valor inválido: [%s] %s = %s\n", arquivo, sec, k, v);
+            erros++;
+        }
+    }
+    fclose(fp);
+    return erros ? -1 : 0;
+}
+
+void config_imprime(const config *c)
+{
+    const fisico *f = &c->f;
+    const mpc_config *m = &c->mpc;
+    printf("fisico: m2=%g L1=%g l2=%g I1=%g I2=%g mu1=%g mu2=%g g=%g\n", f->m2, f->L1, f->l2, f->I1, f->I2, f->mu1,
+           f->mu2, f->g);
+    printf("mpc: Ts=%g Np=%d Q=(%g,%g,%g,%g) Rdu=%g u=[%g,%g] du=[%g,%g] theta1=[%g,%g] dtheta<=%g qv=(%g,%g)\n",
+           c->e.Ts, m->Np, m->Q[0], m->Q[1], m->Q[2], m->Q[3], m->Rdu, m->u_min, m->u_max, m->du_min, m->du_max,
+           m->theta1_min, m->theta1_max, m->dtheta_max, m->qv_theta1, m->qv_dtheta);
+    printf("     rho_avg=%d terminal_dlqr=%d l_max=%d eps_rho=%g max_iter=%d t=%g\n", m->rho_avg, m->terminal_dlqr,
+           m->l_max, m->eps_rho, m->op.max_iter, m->op.t);
+}

@@ -1,0 +1,30 @@
+/* Configuração em arquivo .ini: [fisico], [mpc], [ensaio], [sim]. Chave ausente = valor padrão do artigo. */
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#include "modelo.h"
+#include "qlpv_mpc.h"
+
+typedef struct {
+    double Ts, duracao;
+    double theta1_ref, t_degrau, theta1_degrau;   /* referência de θ1: theta1_ref, e theta1_degrau a partir de t_degrau */
+    double t_disturbio, u_disturbio, dur_disturbio; /* só na simulação: torque somado à entrada */
+    double x0[4];                                 /* só na simulação */
+    int rk4_sub;                                  /* só na simulação: subpassos da planta */
+    char porta[32];
+    double margem_theta1;                         /* restrição de θ1 do MPC = ±(limite do homing − margem) */
+    int usa_limite_homing;                        /* 1: θ1_min/max do MPC vêm do homing */
+    double theta2_aborta;                         /* encerra se |dθ2| passar disso (rad/s) */
+} ensaio;
+
+typedef struct {
+    fisico f;
+    mpc_config mpc;
+    ensaio e;
+} config;
+
+/* Lê o arquivo (NULL = só padrões). Devolve 0 se ok; imprime chaves desconhecidas em stderr. */
+int config_le(const char *arquivo, config *c);
+void config_imprime(const config *c);
+
+#endif
