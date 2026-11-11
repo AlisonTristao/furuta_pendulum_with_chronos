@@ -30,6 +30,7 @@ static volatile bool s_pronto_init = false;
 
 // ------------------------------------------------------------- estado da malha (só núcleo 1)
 static float s_v = 0.0f;               // velocidade comandada do braço (rad/s)
+static int64_t s_t_pronto = 0;         // última vez que a malha não estava em PRONTO (us)
 static int32_t s_offset = 0;           // passos em theta1 = 0
 static int s_erros_enc = 0;
 
@@ -152,6 +153,8 @@ static void tarefa(void *arg)
         float theta1 = (float)(passos - s_offset) / PASSOS_POR_RAD;
 
         if (flt && stepper_habilitado()) falha("DRV8825_FAULT");
+        int64_t agora = esp_timer_get_time();
+        if (s_estado != EST_PRONTO) s_t_pronto = agora;   // conta o tempo parado em PRONTO
 
         switch (s_estado) {
         case EST_HOMING: {
@@ -186,6 +189,10 @@ static void tarefa(void *arg)
                 break;
             }
             s_v = rampa(s_v, 0.0f, A_MAX * dt);
+            if (agora - s_t_pronto > DESLIGA_OCIOSO_MS * 1000LL && s_v == 0.0f) {
+                stepper_habilita(false);    // parado sem uso: desliga o driver (esquenta); refazer o homing
+                s_estado = EST_OCIOSO;
+            }
             break;
         case EST_OCIOSO:
             s_v = rampa(s_v, 0.0f, A_MAX * dt);

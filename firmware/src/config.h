@@ -49,4 +49,5 @@
 // ---------------------------------------------------------------- malha interna
 #define CTRL_HZ            1000
 #define WATCHDOG_MS        200      // sem comando por esse tempo: freia até parar
+#define DESLIGA_OCIOSO_MS  10000    // parado em READY por esse tempo: desliga o driver e volta a IDLE
 #define USA_PINO_FALHA     1        // 0 se o nFAULT não tiver pull-up externo
