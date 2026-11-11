@@ -75,6 +75,7 @@ static void micropasso(int m)
 static int anda(int passos, int m)
 {
     int dir = passos >= 0 ? 1 : -1;
+    int neg0 = gpio_get_level(PIN_FIM_NEG), pos0 = gpio_get_level(PIN_FIM_POS);   // para se alguma MUDAR (NA ou NF)
     int total = passos * dir;
     gpio_set_level(PIN_DIR, dir * DIR_SINAL > 0);
     esp_rom_delay_us(5);
@@ -83,8 +84,9 @@ static int anda(int passos, int m)
     float v = v0;
     int dados = 0;
     for (; dados < total; dados++) {
-        if ((dir < 0 && fim_neg()) || (dir > 0 && fim_pos())) {
-            out("  !! fim de curso acionado, parei\r\n");
+        if (gpio_get_level(PIN_FIM_NEG) != neg0 || gpio_get_level(PIN_FIM_POS) != pos0) {
+            out("  !! fim de curso mudou de estado, parei (FIM_NEG=%d FIM_POS=%d)\r\n", gpio_get_level(PIN_FIM_NEG),
+                gpio_get_level(PIN_FIM_POS));
             break;
         }
         int resta = total - dados;

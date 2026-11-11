@@ -41,7 +41,7 @@
 
 // ---------------------------------------------------------------- encoder
 #define ENC_SINAL          1        // -1 inverte o sentido de theta2
-#define ENC_I2C_HZ         400000
+#define ENC_I2C_HZ         100000   // 400 kHz dá timeout só com os pull-ups internos
 #define ENC_BANDA_VEL_HZ   40.0f    // banda do observador de velocidade de theta2
 #define ENC_ERROS_MAX      20       // leituras I2C seguidas com erro até entrar em falha
 

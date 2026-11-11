@@ -33,7 +33,7 @@ static bool s_primeira = true;
 static bool le_bruto(int32_t *bruto)
 {
     uint8_t b[2];
-    if (i2c_master_transmit_receive(s_dev, &s_modelo->registro, 1, b, 2, 2) != ESP_OK) return false;
+    if (i2c_master_transmit_receive(s_dev, &s_modelo->registro, 1, b, 2, 5) != ESP_OK) return false;
     if (s_modelo->resolucao == 4096)
         *bruto = ((b[0] & 0x0F) << 8) | b[1];
     else
