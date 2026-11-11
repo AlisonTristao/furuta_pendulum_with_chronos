@@ -45,9 +45,12 @@ int main(int argc, char **argv)
     if (e->planta_acel)
         printf("planta comandada em aceleração | observador %g Hz | atraso %g ms | encoder %d bits\n", e->obs_hz,
                e->atraso_ms, e->bits_enc);
+    mpc_config cfg_eq = config_mpc_equilibrio(&cfg);
+    int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), em_eq = 0, n_trocas = 0;
+    double u_ant = 0;
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
     FILE *out = livre ? fopen(livre, "w") : NULL;
-    if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms\n");
+    if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,eq\n");
 
     int K = (int)lround(e->duracao / e->Ts);
     double t_up = -1, soma_tc = 0, max_tc = 0, soma_qp = 0, max_a = 0;
@@ -59,7 +62,17 @@ int main(int argc, char **argv)
         double t0 = periodo_agora();
         double xc[4] = {xm[0], xm[1], xm[2], xm[3]};   /* compensação do atraso */
         if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
+        if (troca) {                                  /* swing-up <-> equilíbrio, com histerese */
+            int quer = fabs(xc[1]) < (em_eq ? 2 : 1) * e->troca_equilibrio;
+            if (quer != em_eq) {
+                mpc_libera(c);
+                c = mpc_cria(quer ? &cfg_eq : &cfg.mpc, &m, xc, u_ant);
+                em_eq = quer;
+                n_trocas++;
+            }
+        }
         double u = mpc_passo(c, xc, ref, &in);
+        u_ant = u;
         double tc = (periodo_agora() - t0) * 1e3;
         double a = modelo_acel_braco(&m, xc, u);
         a_cmd = a;
@@ -68,8 +81,8 @@ int main(int argc, char **argv)
         soma_qp += in.n_qp;
         max_a = fmax(max_a, fabs(a));
         if (out)
-            fprintf(out, "%.4f,%.10g,%.10g,%.10g,%.10g,%.6g,%.12g,%.8g,%d,%d,%.3e,%.4f\n", t, x[0], x[1], x[2], x[3],
-                    ref[0], u, a, in.n_qp, in.n_it, in.dP, tc);
+            fprintf(out, "%.4f,%.10g,%.10g,%.10g,%.10g,%.6g,%.12g,%.8g,%d,%d,%.3e,%.4f,%d\n", t, x[0], x[1], x[2], x[3],
+                    ref[0], u, a, in.n_qp, in.n_it, in.dP, tc, em_eq);
         if (t_up < 0 && fabs(wrap(x[1])) < 0.1 && fabs(x[3]) < 0.5) t_up = t;
         if (!in.finito) {
             printf("controle não finito em t = %.2f s\n", t);
@@ -103,6 +116,7 @@ int main(int argc, char **argv)
            x[1], x[2], x[3]);
     printf("t_calc: médio %.2f ms, máx %.2f ms | QPs por passo: %.2f | máx |θ̈1| = %.1f rad/s²\n", soma_tc / (k ? k : 1), max_tc,
            soma_qp / (k ? k : 1), max_a);
+    if (troca) printf("trocas swing-up/equilíbrio: %d\n", n_trocas);
     if (out) fclose(out);
     mpc_libera(c);
     return 0;

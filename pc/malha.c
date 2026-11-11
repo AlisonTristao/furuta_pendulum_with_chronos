@@ -174,14 +174,18 @@ int main(int argc, char **argv)
     x[1] -= off2;
 
     modelo m = modelo_de_fisico(cfg.f, e->Ts, cfg.mpc.dtheta_max);
-    mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
+    mpc_config cfg_eq = config_mpc_equilibrio(&cfg);   /* depois do homing: já com o limite de θ1 */
+    int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), n_trocas = 0;
+    int em_eq = troca && e->equilibrio;
+    double u_ant = 0;
+    mpc *c = mpc_cria(em_eq ? &cfg_eq : &cfg.mpc, &m, x, 0.0);
     FILE *out = fopen(arq, "w");
     if (!out) {
         fprintf(stderr, "não abriu %s\n", arq);
         encerra(f);
         return 1;
     }
-    fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,t_ciclo_ms,atraso_ms\n");
+    fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,t_ciclo_ms,atraso_ms,eq\n");
 
     periodo_prioridade_alta();
     periodo *p = periodo_cria(e->Ts);
@@ -205,7 +209,17 @@ int main(int argc, char **argv)
         double tc0 = periodo_agora();
         double xc[4] = {x[0], x[1], x[2], x[3]};    /* compensação do atraso: estado daqui a comp_atraso_ms */
         if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
+        if (troca) {                                  /* swing-up <-> equilíbrio, com histerese */
+            int quer = fabs(xc[1]) < (em_eq ? 2 : 1) * e->troca_equilibrio;
+            if (quer != em_eq) {
+                mpc_libera(c);
+                c = mpc_cria(quer ? &cfg_eq : &cfg.mpc, &m, xc, u_ant);
+                em_eq = quer;
+                n_trocas++;
+            }
+        }
         double u = mpc_passo(c, xc, ref, &in);
+        u_ant = u;
         double tcalc = (periodo_agora() - tc0) * 1e3;
         if (!in.finito) {
             motivo = "controle não finito";
@@ -216,8 +230,8 @@ int main(int argc, char **argv)
         double xa[4];
         st = furuta_acel(f, a, xa, 10);
         double tciclo = (periodo_agora() - ti) * 1e3;
-        fprintf(out, "%.4f,%.6f,%.6f,%.5f,%.5f,%.5f,%.6f,%.4f,%d,%d,%.3e,%.4f,%.4f,%.4f\n", t, x[0], x[1], x[2],
-                x[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tcalc, tciclo, atraso);
+        fprintf(out, "%.4f,%.6f,%.6f,%.5f,%.5f,%.5f,%.6f,%.4f,%d,%d,%.3e,%.4f,%.4f,%.4f,%d\n", t, x[0], x[1], x[2],
+                x[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tcalc, tciclo, atraso, em_eq);
         if (st != FURUTA_OK) {
             motivo = st == FURUTA_ERR ? "o firmware recusou o comando (ver estado)" : "envio do comando falhou";
             break;
@@ -240,6 +254,7 @@ int main(int argc, char **argv)
         printf("MPC: %.2f ms médio, %.2f ms máx | ciclo (X + MPC + envio): %.2f ms médio, %.2f ms máx, %d acima de Ts "
                "| maior atraso do período: %.2f ms\n",
                soma_calc / k, max_calc, soma_ciclo / k, max_ciclo, estouros, max_atraso);
+    if (troca) printf("trocas swing-up/equilíbrio: %d\n", n_trocas);
     printf("dados: %s\n", arq);
     mpc_libera(c);
     periodo_libera(p);

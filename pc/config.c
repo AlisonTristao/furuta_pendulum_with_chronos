@@ -76,6 +76,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("mpc", "l_max", c->mpc.l_max) NUM("mpc", "eps_rho", c->mpc.eps_rho)
     INT("mpc", "max_iter", c->mpc.op.max_iter) NUM("mpc", "t_barreira", c->mpc.op.t)
     NUM("mpc", "eps", c->mpc.op.eps)
+    NUM("mpc", "u_max_equilibrio", c->u_max_eq) NUM("mpc", "Rdu_equilibrio", c->Rdu_eq)
     if (!strcmp(sec, "mpc") && !strcmp(k, "Q")) return lista(v, c->mpc.Q, 4) == 4 ? 0 : -1;
 
     NUM("ensaio", "Ts", c->e.Ts) NUM("ensaio", "duracao", c->e.duracao)
@@ -83,7 +84,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "theta1_degrau", c->e.theta1_degrau) NUM("ensaio", "margem_theta1", c->e.margem_theta1)
     INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
-    NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms)
+    NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) NUM("ensaio", "troca_equilibrio", c->e.troca_equilibrio)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;
         c->e.equilibrio = !strcmp(v, "equilibrio");
@@ -161,6 +162,14 @@ int config_le(const char *arquivo, config *c)
     return erros ? -1 : 0;
 }
 
+mpc_config config_mpc_equilibrio(const config *c)
+{
+    mpc_config m = c->mpc;
+    if (c->u_max_eq > 0) m.u_min = -c->u_max_eq, m.u_max = c->u_max_eq;
+    if (c->Rdu_eq > 0) m.Rdu = c->Rdu_eq;
+    return m;
+}
+
 int config_arg(config *c, const char *arg)
 {
     char b[160];
@@ -202,6 +211,8 @@ void config_imprime(const config *c)
     printf("mpc: Ts=%g Np=%d Q=(%g,%g,%g,%g) Rdu=%g u=[%g,%g] du=[%g,%g] theta1=[%g,%g] dtheta<=%g qv=(%g,%g)\n",
            c->e.Ts, m->Np, m->Q[0], m->Q[1], m->Q[2], m->Q[3], m->Rdu, m->u_min, m->u_max, m->du_min, m->du_max,
            m->theta1_min, m->theta1_max, m->dtheta_max, m->qv_theta1, m->qv_dtheta);
+    if (c->u_max_eq > 0 || c->Rdu_eq > 0)
+        printf("equilíbrio: u=±%g Rdu=%g (troca em |θ2| < %g rad)\n", c->u_max_eq, c->Rdu_eq, c->e.troca_equilibrio);
     printf("     rho_avg=%d terminal_dlqr=%d l_max=%d eps_rho=%g max_iter=%d t=%g\n", m->rho_avg, m->terminal_dlqr,
            m->l_max, m->eps_rho, m->op.max_iter, m->op.t);
 }

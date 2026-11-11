@@ -22,12 +22,14 @@ typedef struct {
     double theta2_aborta;                         /* encerra se |dθ2| passar disso (rad/s) */
     int equilibrio;                               /* modo = equilibrio: o controle só assume perto do topo */
     double comp_atraso_ms;                        /* prediz o estado este tempo à frente (com o último comando) antes do MPC */
+    double troca_equilibrio;                      /* |θ2| (rad) em que passa ao controle de equilíbrio (volta em 2×) */
     double janela_equilibrio;                     /* |θ2| (rad) em que o modo equilíbrio assume */
 } ensaio;
 
 typedef struct {
     fisico f;
     mpc_config mpc;
+    double u_max_eq, Rdu_eq;                      /* controle de equilíbrio (u ±u_max_eq); 0 = o mesmo do swing-up */
     ensaio e;
 } config;
 
@@ -36,6 +38,8 @@ int config_le(const char *arquivo, config *c);
 void config_imprime(const config *c);
 /* "secao.chave=valor" da linha de comando (ex.: mpc.u_max=1.25). Devolve 0 se ok. */
 int config_arg(config *c, const char *arg);
+/* Configuração do controle de equilíbrio (a do swing-up com u ±u_max_eq e Rdu_eq). */
+mpc_config config_mpc_equilibrio(const config *c);
 /* Lê o .ini e aplica os argumentos com '=' a partir de argv[2]; os outros vão para *livre (o 1º). */
 int config_le_args(int argc, char **argv, config *c, const char **livre);
 
