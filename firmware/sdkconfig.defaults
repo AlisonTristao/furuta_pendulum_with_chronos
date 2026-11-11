@@ -3,8 +3,8 @@ CONFIG_FREERTOS_HZ=1000
 
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 
-# A UART0 é só do protocolo: sem console nem logs nela
-CONFIG_ESP_CONSOLE_NONE=y
+# A UART0 é do protocolo: logs desligados. O console fica na UART0 (CONFIG_ESP_CONSOLE_NONE=y
+# deixava o app reiniciando em loop no ESP-IDF 6.0.1); com logs NONE nada sai nele, só um pânico.
 CONFIG_LOG_DEFAULT_LEVEL_NONE=y
 CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
 

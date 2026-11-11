@@ -3,7 +3,9 @@
 
 #include <math.h>
 
+#include "driver/gpio.h"
 #include "driver/i2c_master.h"
+#include "esp_rom_sys.h"
 
 #define DOIS_PI 6.28318530718f
 
@@ -41,8 +43,38 @@ static bool le_bruto(int32_t *bruto)
     return true;
 }
 
+// Recuperação do barramento: um reset no meio de uma leitura deixa o escravo segurando o SDA em 0.
+// Até 9 pulsos no SCL terminam o byte pendente; depois um STOP (SDA 0 -> 1 com SCL em 1).
+static void libera_barramento(void)
+{
+    gpio_config_t od = {
+        .pin_bit_mask = (1ULL << PIN_SDA) | (1ULL << PIN_SCL),
+        .mode = GPIO_MODE_INPUT_OUTPUT_OD,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+    };
+    gpio_config(&od);
+    gpio_set_level(PIN_SDA, 1);
+    gpio_set_level(PIN_SCL, 1);
+    esp_rom_delay_us(10);
+    for (int i = 0; i < 9 && gpio_get_level(PIN_SDA) == 0; i++) {
+        gpio_set_level(PIN_SCL, 0);
+        esp_rom_delay_us(10);
+        gpio_set_level(PIN_SCL, 1);
+        esp_rom_delay_us(10);
+    }
+    gpio_set_level(PIN_SDA, 0);
+    esp_rom_delay_us(10);
+    gpio_set_level(PIN_SCL, 1);
+    esp_rom_delay_us(10);
+    gpio_set_level(PIN_SDA, 1);
+    esp_rom_delay_us(10);
+    gpio_reset_pin(PIN_SDA);
+    gpio_reset_pin(PIN_SCL);
+}
+
 esp_err_t encoder_init(void)
 {
+    libera_barramento();
     i2c_master_bus_config_t bus = {
         .i2c_port = -1,
         .sda_io_num = PIN_SDA,
@@ -53,11 +85,14 @@ esp_err_t encoder_init(void)
     };
     esp_err_t err = i2c_new_master_bus(&bus, &s_bus);
     if (err != ESP_OK) return err;
-    for (int i = 0; i < (int)(sizeof(MODELOS) / sizeof(MODELOS[0])); i++) {
-        if (i2c_master_probe(s_bus, MODELOS[i].endereco, 20) == ESP_OK) {
-            s_modelo = &MODELOS[i];
-            break;
+    for (int tentativa = 0; tentativa < 5 && !s_modelo; tentativa++) {
+        for (int i = 0; i < (int)(sizeof(MODELOS) / sizeof(MODELOS[0])); i++) {
+            if (i2c_master_probe(s_bus, MODELOS[i].endereco, 20) == ESP_OK) {
+                s_modelo = &MODELOS[i];
+                break;
+            }
         }
+        if (!s_modelo) esp_rom_delay_us(20000);
     }
     if (!s_modelo) return ESP_ERR_NOT_FOUND;
     i2c_device_config_t dev = {
