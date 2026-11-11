@@ -16,6 +16,13 @@ typedef struct {
     double obs_hz;                                /* só na simulação: dθ2 pelo observador do firmware (0 = ideal) */
     double atraso_ms;                             /* só na simulação: atraso entre a leitura e o novo comando */
     int bits_enc;                                 /* só na simulação: quantização de θ2 (0 = ideal) */
+    double ruido_enc;                             /* só na simulação: ruído de θ2 (desvio, em LSB do encoder) */
+    double passos_rev;                            /* só na simulação: micropassos por volta (θ1 em passos inteiros; 0 = ideal) */
+    double a_max_fw, v_max_fw, limite_fw;
+    double f_motor, zeta_motor;
+    double mu2_planta;
+    double ripple_passo;                          /* só na simulação: erro do micropasso, fração do passo inteiro (com f_motor > 0) */
+    int semente;                                  /* só na simulação: > 0 sorteia ruído e perturba θ2 inicial (±0,05 rad) */                            /* só na simulação: atrito viscoso do pêndulo na planta (0 = o do modelo) */                   /* só na simulação: ressonância rotor+braço (0 = rígido) */         /* só na simulação: saturações e limite de software do firmware (0 = sem) */
     char porta[32];
     double margem_theta1;                         /* restrição de θ1 do MPC = ±(limite do homing − margem) */
     int usa_limite_homing;                        /* 1: θ1_min/max do MPC vêm do homing */

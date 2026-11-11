@@ -103,6 +103,11 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("sim", "dur_disturbio", c->e.dur_disturbio) NUM("sim", "tc2", c->e.tc2) INT("sim", "rk4_sub", c->e.rk4_sub)
     INT("sim", "planta_acel", c->e.planta_acel) NUM("sim", "obs_hz", c->e.obs_hz)
     NUM("sim", "atraso_ms", c->e.atraso_ms) INT("sim", "bits_enc", c->e.bits_enc)
+    NUM("sim", "ruido_enc", c->e.ruido_enc) NUM("sim", "passos_rev", c->e.passos_rev)
+    NUM("sim", "a_max", c->e.a_max_fw) NUM("sim", "v_max", c->e.v_max_fw) NUM("sim", "limite_sw", c->e.limite_fw)
+    NUM("sim", "f_motor", c->e.f_motor) NUM("sim", "zeta_motor", c->e.zeta_motor)
+    NUM("sim", "mu2_planta", c->e.mu2_planta) INT("sim", "semente", c->e.semente)
+    NUM("sim", "ripple_passo", c->e.ripple_passo)
     if (!strcmp(sec, "sim") && !strcmp(k, "x0")) return lista(v, c->e.x0, 4) == 4 ? 0 : -1;
 #undef NUM
 #undef INT
