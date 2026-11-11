@@ -9,8 +9,8 @@
  * O programa mede o período (ωd, corrigido para a amplitude) e o decaimento dos picos (σ = ζ ωn), e devolve I2 e μ2
  * para o m2 do .ini (a massa só escala I2 e μ2 juntos).
  *
- * Passos: O (origem aqui, liga o driver, sem homing) -> Z com o pêndulo parado embaixo -> Enter -> você solta o
- * pêndulo de 20-30° -> grava `duracao_ident` s mandando aceleração 0 (o braço fica parado) -> E0. */
+ * Passos: Z com o pêndulo parado embaixo -> você levanta e segura o pêndulo -> O (trava o braço, sem homing) -> você
+ * solta -> grava 20 s a partir da soltura mandando aceleração 0 (o braço fica parado) -> E0. */
 #include "config.h"
 #include "furuta_serial.h"
 #include "periodo.h"
@@ -78,7 +78,7 @@ int main(int argc, char **argv)
     }
     config cfg;
     if (config_le(argv[1], &cfg)) return 1;
-    const double dur = 25.0, Tam = 0.01, g = cfg.f.g, l2 = cfg.f.l2, m2 = cfg.f.m2;
+    const double dur = 20.0, espera_max = 30.0, Tam = 0.01, g = cfg.f.g, l2 = cfg.f.l2, m2 = cfg.f.m2;
     static double t[NMAX], phi[NMAX];
     if (argc > 3 && !strcmp(argv[2], "--analisa")) {        /* só reanalisa um CSV gravado */
         int n = le_csv(argv[3], t, phi);
@@ -102,29 +102,38 @@ int main(int argc, char **argv)
         return 1;
     }
     printf("ESP32: %s\nl2 = %.4f m, m2 = %.4f kg (do %s)\n", r, l2, m2, argv[1]);
-    espera_enter("\nDeixe o pêndulo PARADO embaixo e aperte Enter (zera o encoder e trava o braço)... ");
+    espera_enter("\n1) Deixe o pêndulo PARADO embaixo e aperte Enter (zera o encoder)... ");
     furuta_comando(f, "Z", r, sizeof(r), 300);
+    espera_enter("2) Levante o pêndulo uns 20-30 graus, SEGURE parado e aperte Enter (trava o braço)... ");
     if (furuta_comando(f, "O", r, sizeof(r), 300) != FURUTA_OK) {
         fprintf(stderr, "O falhou: %s\n", r);
         return 1;
     }
-    espera_enter("Braço travado. Aperte Enter e, logo depois, levante o pêndulo uns 20-30 graus e SOLTE... ");
+    printf("3) Braço travado. SOLTE o pêndulo quando quiser (até %.0f s) e não encoste mais.\n", espera_max);
 
     int n = 0;
+    double t_solto = -1;
     periodo *p = periodo_cria(Tam);
     double t0 = periodo_agora();
-    printf("gravando %.0f s...\n", dur);
-    while (n < NMAX && periodo_agora() - t0 < dur) {
+    while (n < NMAX) {
         periodo_espera(p);
-        double x[4];
+        double x[4], tt = periodo_agora() - t0;
         if (furuta_acel(f, 0.0, x, 20) != FURUTA_OK) {      /* aceleração 0: braço parado, watchdog alimentado */
-            fprintf(stderr, "comunicação falhou em t = %.2f s: %s\n", periodo_agora() - t0,
-                    furuta_ultima_resposta(f));
+            fprintf(stderr, "comunicação falhou em t = %.2f s: %s\n", tt, furuta_ultima_resposta(f));
             break;
         }
-        t[n] = periodo_agora() - t0;
+        t[n] = tt;
         phi[n] = x[1] - PI;
         n++;
+        if (t_solto < 0 && fabs(phi[n - 1]) > 0.1 && fabs(x[3]) > 1.0) {   /* saiu da mão: ganhou velocidade */
+            t_solto = tt;
+            printf("solto em t = %.1f s, gravando %.0f s...\n", tt, dur);
+        }
+        if (t_solto < 0 && tt > espera_max) {
+            fprintf(stderr, "não detectou a soltura em %.0f s\n", espera_max);
+            break;
+        }
+        if (t_solto >= 0 && tt > t_solto + dur) break;
     }
     furuta_comando(f, "E0", r, sizeof(r), 300);
     furuta_desconecta(f);

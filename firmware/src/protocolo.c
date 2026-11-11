@@ -120,7 +120,13 @@ static void tarefa(void *arg)
     uint8_t buf[64];
     envia("BOOT,furuta,%s", encoder_nome());
     for (;;) {
-        int lidos = uart_read_bytes(UART, buf, sizeof(buf), pdMS_TO_TICKS(20));
+        // espera o 1º byte e pega só o que já chegou: ler `sizeof(buf)` bytes com prazo segurava cada comando
+        // curto até o prazo inteiro (20 ms de latência por comando)
+        int lidos = uart_read_bytes(UART, buf, 1, portMAX_DELAY);
+        size_t disp = 0;
+        uart_get_buffered_data_len(UART, &disp);
+        if (lidos == 1 && disp > 0)
+            lidos += uart_read_bytes(UART, buf + 1, disp < sizeof(buf) - 1 ? disp : sizeof(buf) - 1, 0);
         for (int i = 0; i < lidos; i++) {
             char c = (char)buf[i];
             if (c == '\n') {
