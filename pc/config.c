@@ -22,6 +22,7 @@ static void padroes(config *c)
     e.margem_theta1 = 0.0;
     e.usa_limite_homing = 1;
     e.theta2_aborta = 60;
+    e.janela_equilibrio = 0.15;
     c->e = e;
 }
 
@@ -81,13 +82,19 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "theta1_ref", c->e.theta1_ref) NUM("ensaio", "t_degrau", c->e.t_degrau)
     NUM("ensaio", "theta1_degrau", c->e.theta1_degrau) NUM("ensaio", "margem_theta1", c->e.margem_theta1)
     INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
+    NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
+    if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
+        if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;
+        c->e.equilibrio = !strcmp(v, "equilibrio");
+        return 0;
+    }
     if (!strcmp(sec, "ensaio") && !strcmp(k, "porta")) {
         snprintf(c->e.porta, sizeof(c->e.porta), "%s", v);
         return 0;
     }
 
     NUM("sim", "t_disturbio", c->e.t_disturbio) NUM("sim", "u_disturbio", c->e.u_disturbio)
-    NUM("sim", "dur_disturbio", c->e.dur_disturbio) INT("sim", "rk4_sub", c->e.rk4_sub)
+    NUM("sim", "dur_disturbio", c->e.dur_disturbio) NUM("sim", "tc2", c->e.tc2) INT("sim", "rk4_sub", c->e.rk4_sub)
     if (!strcmp(sec, "sim") && !strcmp(k, "x0")) return lista(v, c->e.x0, 4) == 4 ? 0 : -1;
 #undef NUM
 #undef INT

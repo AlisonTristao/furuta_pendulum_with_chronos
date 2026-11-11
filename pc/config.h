@@ -11,10 +11,13 @@ typedef struct {
     double t_disturbio, u_disturbio, dur_disturbio; /* só na simulação: torque somado à entrada */
     double x0[4];                                 /* só na simulação */
     int rk4_sub;                                  /* só na simulação: subpassos da planta */
+    double tc2;                                   /* só na simulação: atrito seco do pêndulo [N·m] */
     char porta[32];
     double margem_theta1;                         /* restrição de θ1 do MPC = ±(limite do homing − margem) */
     int usa_limite_homing;                        /* 1: θ1_min/max do MPC vêm do homing */
     double theta2_aborta;                         /* encerra se |dθ2| passar disso (rad/s) */
+    int equilibrio;                               /* modo = equilibrio: o controle só assume perto do topo */
+    double janela_equilibrio;                     /* |θ2| (rad) em que o modo equilíbrio assume */
 } ensaio;
 
 typedef struct {

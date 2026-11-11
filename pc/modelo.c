@@ -15,6 +15,7 @@ modelo modelo_de_fisico(fisico f, double Ts, double vmax)
     m.mu2 = f.mu2;
     m.Ts = Ts;
     m.vmax = vmax;
+    m.tc2 = 0;
     return m;
 }
 
@@ -25,7 +26,7 @@ void modelo_ode(const modelo *m, const double x[4], double u, double dx[4])
     double M11 = m->alpha + m->beta * s * s, M12 = m->gamma * c, M22 = m->delta;
     double N11 = m->beta * d2 * s2, N12 = -m->gamma * d2 * s, N21 = -0.5 * m->beta * d1 * s2;
     double r1 = u - m->mu1 * d1 - (N11 * d1 + N12 * d2);
-    double r2 = -m->mu2 * d2 - N21 * d1 + m->eta * s;
+    double r2 = -m->mu2 * d2 - N21 * d1 + m->eta * s - m->tc2 * tanh(d2 / 0.01);   /* Coulomb suavizado */
     double det = M11 * M22 - M12 * M12;
     dx[0] = d1;
     dx[1] = d2;

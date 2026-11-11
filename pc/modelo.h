@@ -11,6 +11,7 @@ typedef struct {
 /* Parâmetros agrupados (eq. 9) + Ts e o limite de velocidade usado em f_ρ. */
 typedef struct {
     double alpha, beta, gamma, delta, eta, mu1, mu2, Ts, vmax;
+    double tc2;   /* atrito seco no pêndulo [N·m] (só na planta simulada; o MPC usa 0) */
 } modelo;
 
 modelo modelo_de_fisico(fisico f, double Ts, double vmax);

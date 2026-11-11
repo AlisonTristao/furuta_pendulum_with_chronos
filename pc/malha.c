@@ -2,10 +2,11 @@
  *
  *   malha.exe <config.ini> [saida.csv]      (padrão: ensaios/ensaio_AAAAMMDD_HHMMSS.csv)
  *
- * Sequência: conecta -> homing (H; o limite de θ1 do MPC vem daqui) -> pede o pêndulo parado embaixo e zera θ2 (Z)
- * -> Enter -> laço de Ts. A cada período: X (lê o estado), MPC (torque u), u -> θ̈1 pelo modelo, envia θ̈1.
- * Termina no fim da duração, no Ctrl+C ou em qualquer erro: para de mandar comandos (o firmware freia o braço em
- * 200 ms) e desliga o driver (E0).
+ * Sequência: conecta -> pêndulo parado embaixo, Enter: zera θ2 (Z) -> Enter: homing (H; o limite de θ1 do MPC vem
+ * daqui) -> espera a condição de partida mandando aceleração 0 (modo swingup: pêndulo parado embaixo por 1 s; modo
+ * equilibrio: você leva o pêndulo até |θ2| < janela_equilibrio) -> laço de Ts. A cada período: X (lê o estado), MPC
+ * (torque u), u -> θ̈1 pelo modelo, envia θ̈1. Termina no fim da duração, no Ctrl+C ou em qualquer erro: para de
+ * mandar comandos (o firmware freia o braço em 200 ms) e desliga o driver (E0).
  *
  * CSV: t, θ1, θ2, dθ1, dθ2, θ1_ref, u, a, n_qp, n_it, dP, t_calc_ms (MPC), t_ciclo_ms (X até a resposta do envio),
  *      atraso_ms (início do período em relação ao instante ideal) */
@@ -30,6 +31,8 @@
 #include <unistd.h>
 #define mkdir_(d) mkdir(d, 0755)
 #endif
+
+#define PI 3.14159265358979323846
 
 static volatile sig_atomic_t g_parar = 0;
 static void ao_ctrl_c(int s)
@@ -102,7 +105,20 @@ int main(int argc, char **argv)
     }
     printf("ESP32: %s\n", r);
 
-    /* homing: limite de θ1 */
+    config_imprime(&cfg);
+    printf("\nModo %s, %.0f s, Ts = %.0f ms.\n", e->equilibrio ? "EQUILÍBRIO" : "SWING-UP", e->duracao, e->Ts * 1e3);
+    espera_enter("1) Deixe o pêndulo PARADO, pendurado embaixo, e aperte Enter (zera o encoder)... ");
+    furuta_comando(f, "Z", r, sizeof(r), 300);
+    double x[4];
+    if (furuta_estado(f, x, 100) != FURUTA_OK) {
+        fprintf(stderr, "leitura do estado falhou: %s\n", furuta_ultima_resposta(f));
+        return 1;
+    }
+    printf("   θ2 = %.3f (pi = embaixo)\n", x[1]);
+    espera_enter("2) Enter para começar: homing e, em seguida, o controle (Ctrl+C para parar)... ");
+
+    /* homing: limite de θ1. Daqui em diante sempre há comando a cada <= 20 ms (o driver não desliga) */
+    signal(SIGINT, ao_ctrl_c);
     printf("homing (o braço vai até os dois fins de curso e volta ao meio)...\n");
     if (furuta_comando(f, "H", r, sizeof(r), 60000) != FURUTA_OK) {
         fprintf(stderr, "homing falhou: %s\n", r);
@@ -115,28 +131,45 @@ int main(int argc, char **argv)
     if (e->usa_limite_homing) {
         cfg.mpc.theta1_max = lim - e->margem_theta1;
         cfg.mpc.theta1_min = -cfg.mpc.theta1_max;
+        printf("restrição de θ1 do MPC: ±%.3f rad\n", cfg.mpc.theta1_max);
     }
-    config_imprime(&cfg);
 
-    espera_enter("\nDeixe o pêndulo PARADO, pendurado embaixo, e aperte Enter para zerar o encoder... ");
-    furuta_comando(f, "Z", r, sizeof(r), 300);
-    double x[4];
-    if (furuta_estado(f, x, 100) != FURUTA_OK) {
-        fprintf(stderr, "leitura do estado falhou: %s\n", furuta_ultima_resposta(f));
-        encerra(f);
-        return 1;
+    /* espera a condição de partida mandando aceleração 0 (braço parado no meio) */
+    if (e->equilibrio)
+        printf("\nLEVE O PÊNDULO ATÉ O TOPO com a mão. O controle assume quando |θ2| < %.2f rad (%.0f graus) e\n"
+               "|dθ2| < 2 rad/s; solte quando sentir o braço mexer.\n",
+               e->janela_equilibrio, e->janela_equilibrio * 57.3);
+    else
+        printf("esperando o pêndulo parar embaixo (a homing balança ele)...\n");
+    double tw = periodo_agora(), t_quieto = -1;
+    for (;;) {
+        if (g_parar || periodo_agora() - tw > 60) {
+            printf("%s\n", g_parar ? "Ctrl+C" : "60 s sem a condição de partida");
+            encerra(f);
+            return 1;
+        }
+        if (furuta_acel(f, 0.0, x, 20) != FURUTA_OK) {
+            fprintf(stderr, "comunicação falhou antes de começar: %s\n", furuta_ultima_resposta(f));
+            encerra(f);
+            return 1;
+        }
+        double th = x[1] - 2 * PI * floor((x[1] + PI) / (2 * PI));   /* (-π, π], 0 = topo */
+        if (e->equilibrio) {
+            if (fabs(th) < e->janela_equilibrio && fabs(x[3]) < 2) break;
+        } else {                                                     /* parado embaixo por 1 s */
+            int quieto = fabs(fabs(th) - PI) < 0.1 && fabs(x[3]) < 0.1;
+            if (!quieto) t_quieto = -1;
+            else if (t_quieto < 0) t_quieto = periodo_agora();
+            else if (periodo_agora() - t_quieto > 1.0) break;
+        }
+        dorme_ms(10);
     }
-    printf("estado: θ1 = %.3f, θ2 = %.3f (pi = embaixo), dθ1 = %.3f, dθ2 = %.3f\n", x[0], x[1], x[2], x[3]);
-    printf("\nControle por %.0f s, Ts = %.0f ms. Ctrl+C para parar.\n", e->duracao, e->Ts * 1e3);
-    espera_enter("Enter para começar... ");
-
-    /* o driver desliga sozinho após 10 s parado em READY: confere */
-    furuta_comando(f, "S", r, sizeof(r), 300);
-    if (!strstr(r, "READY")) {
-        fprintf(stderr, "o firmware não está em READY (%s): o driver desliga após 10 s parado; rode de novo\n", r);
-        encerra(f);
-        return 1;
-    }
+    printf("controle ligado\n");
+    /* θ2 no múltiplo de 2π mais próximo de 0 no início (o pêndulo pode ter subido por qualquer lado); depois
+     * fica contínuo para não pular a predição quando passa por baixo */
+    double off2 = e->equilibrio ? 2 * PI * floor((x[1] + PI) / (2 * PI))   /* topo: θ2 em (-π, π] */
+                                : 2 * PI * floor(x[1] / (2 * PI));         /* embaixo: θ2 em [0, 2π), ≈ π */
+    x[1] -= off2;
 
     modelo m = modelo_de_fisico(cfg.f, e->Ts, cfg.mpc.dtheta_max);
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
@@ -148,7 +181,6 @@ int main(int argc, char **argv)
     }
     fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,t_ciclo_ms,atraso_ms\n");
 
-    signal(SIGINT, ao_ctrl_c);
     periodo_prioridade_alta();
     periodo *p = periodo_cria(e->Ts);
     int K = (int)lround(e->duracao / e->Ts), k, estouros = 0;
@@ -164,6 +196,7 @@ int main(int argc, char **argv)
             motivo = st == FURUTA_REINICIOU ? "o ESP32 reiniciou" : "leitura do estado falhou";
             break;
         }
+        x[1] -= off2;
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
         double tc0 = periodo_agora();

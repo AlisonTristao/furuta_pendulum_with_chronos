@@ -32,6 +32,9 @@ int main(int argc, char **argv)
     config_imprime(&cfg);
     const ensaio *e = &cfg.e;
     modelo m = modelo_de_fisico(cfg.f, e->Ts, cfg.mpc.dtheta_max);
+    modelo planta = m;                            /* a planta pode ter atrito seco; o MPC não */
+    planta.tc2 = e->tc2;
+    if (e->tc2 > 0) printf("planta com atrito seco tc2 = %g N·m (o MPC não modela)\n", e->tc2);
     double x[4] = {e->x0[0], e->x0[1], e->x0[2], e->x0[3]};
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
     FILE *out = argc > 2 ? fopen(argv[2], "w") : NULL;
@@ -61,7 +64,7 @@ int main(int argc, char **argv)
             break;
         }
         double ud = u + (t >= e->t_disturbio && t < e->t_disturbio + e->dur_disturbio ? e->u_disturbio : 0);
-        modelo_passo(&m, x, ud, e->rk4_sub);
+        modelo_passo(&planta, x, ud, e->rk4_sub);
     }
     printf("passos %d | swing-up (|θ2| < 0,1 rad) em %.2f s | x final = (%.3f, %.3f, %.3f, %.3f)\n", k, t_up, x[0],
            x[1], x[2], x[3]);
