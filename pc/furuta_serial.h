@@ -3,6 +3,7 @@
  *
  *   <a>    aceleração do braço [rad/s²]  -> "t1,t2,dt1,dt2"  (ou "ERR,<estado>" fora de PRONTO/RODANDO)
  *   H      homing                         -> "OK,<meio_curso>,<limite>" | "ERR,<motivo>"
+ *   X      só lê o estado              -> "t1,t2,dt1,dt2"
  *   O      origem aqui, sem homing        -> "OK,<meio_curso>,<limite>"
  *   Z      pêndulo parado embaixo: t2 = pi -> "OK"
  *   S      estado                         -> "S,<estado>,<erro>,<encoder>,<fim_neg>,<fim_pos>,<flt>"
@@ -29,6 +30,11 @@ void furuta_desconecta(furuta *f);
 /* Manda a aceleração a [rad/s²] e lê o estado x = (θ1, θ2, dθ1, dθ2) que o firmware tinha ao receber o
  * comando. Devolve FURUTA_OK ou um código de erro. */
 int furuta_acel(furuta *f, double a, double x[4], int timeout_ms);
+
+/* Só lê o estado (comando X): não mexe no comando de aceleração nem no watchdog. */
+int furuta_estado(furuta *f, double x[4], int timeout_ms);
+/* Descarta o que estiver no buffer de entrada (ex.: "BOOT" de um reinício). */
+void furuta_limpa(furuta *f);
 
 /* Comando de texto qualquer (H, O, Z, S, E0, E1, I); resp recebe a linha de resposta. */
 int furuta_comando(furuta *f, const char *cmd, char *resp, int cap, int timeout_ms);

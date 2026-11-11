@@ -75,3 +75,12 @@ int furuta_acel(furuta *f, double a, double x[4], int timeout_ms)
     if (r != FURUTA_OK) return r;
     return furuta_le_estado(f->resp, x) == 0 ? FURUTA_OK : FURUTA_FORMATO;
 }
+
+int furuta_estado(furuta *f, double x[4], int timeout_ms)
+{
+    int r = furuta_comando(f, "X", NULL, 0, timeout_ms);
+    if (r != FURUTA_OK) return r;
+    return furuta_le_estado(f->resp, x) == 0 ? FURUTA_OK : FURUTA_FORMATO;
+}
+
+void furuta_limpa(furuta *f) { serial_limpa(f->s); }
