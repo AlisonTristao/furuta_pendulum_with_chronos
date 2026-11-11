@@ -94,6 +94,16 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     return -1;
 }
 
+/* Pêndulo = haste uniforme (massa mh, comprimento L, do eixo à ponta) + massa pontual mp na ponta:
+ * m2 = mh + mp, l2 = centro de massa, I2 em torno do centro de massa. */
+static void pendulo_composto(fisico *f, double mh, double L, double mp)
+{
+    f->m2 = mh + mp;
+    f->l2 = (mh * L / 2 + mp * L) / f->m2;
+    double dh = L / 2 - f->l2, dp = L - f->l2;
+    f->I2 = mh * L * L / 12 + mh * dh * dh + mp * dp * dp;
+}
+
 int config_le(const char *arquivo, config *c)
 {
     padroes(c);
@@ -104,7 +114,8 @@ int config_le(const char *arquivo, config *c)
         return -1;
     }
     char linha[256], sec[32] = "";
-    int erros = 0;
+    int erros = 0, tem_geo = 0;
+    double geo[3] = {0, 0, 0};   /* m_haste, L_haste, m_ponta */
     while (fgets(linha, sizeof(linha), fp)) {
         char *p = strpbrk(linha, ";#");
         if (p) *p = '\0';
@@ -120,12 +131,23 @@ int config_le(const char *arquivo, config *c)
         if (!ig) continue;
         *ig = '\0';
         char *k = apara(p), *v = apara(ig + 1);
+        if (!strcmp(sec, "pendulo")) {           /* geometria: calcula m2, l2, I2 no fim */
+            if (!strcmp(k, "m_haste")) geo[0] = atof(v), tem_geo = 1;
+            else if (!strcmp(k, "L_haste")) geo[1] = atof(v), tem_geo = 1;
+            else if (!strcmp(k, "m_ponta")) geo[2] = atof(v), tem_geo = 1;
+            else {
+                fprintf(stderr, "%s: chave desconhecida: [%s] %s\n", arquivo, sec, k);
+                erros++;
+            }
+            continue;
+        }
         if (aplica(c, sec, k, v)) {
             fprintf(stderr, "%s: chave desconhecida ou valor inválido: [%s] %s = %s\n", arquivo, sec, k, v);
             erros++;
         }
     }
     fclose(fp);
+    if (tem_geo) pendulo_composto(&c->f, geo[0], geo[1], geo[2]);
     return erros ? -1 : 0;
 }
 
