@@ -40,6 +40,17 @@ typedef struct {
 
 CHRONOS_API chronos_opcoes chronos_opcoes_padrao(void);
 
+#ifdef CHRONOS_PERFIL
+/* Perfil de tempo (benchmark do firmware): chronos_relogio devolve µs; chronos_perfil acumula por etapa:
+ * 0 grad, 1 resíduos de igualdade, 2 de desigualdade, 3 elementos do KKT, 4 Riccati, 5 folgas, 6 lambda2,
+ * 7 busca de linha, 8 get_variables, 9 dinâmica (ZOH, qlpv_mpc), 10 rollout + folgas iniciais, 11 trajetória ρ */
+extern long long (*chronos_relogio)(void);
+extern long long chronos_perfil[12];
+#define CHRONOS_T(i, expr) do { long long t_ = chronos_relogio(); expr; chronos_perfil[i] += chronos_relogio() - t_; } while (0)
+#else
+#define CHRONOS_T(i, expr) expr
+#endif
+
 /* Cria o problema. Qe (nx×nx), Rdu (nu×nu), P (nx×nx, terminal; NULL = sem custo terminal).
  * Limites: vetores de tamanho nx (estado, qv) e nu (u, Δu); NULL nos desligados. */
 CHRONOS_API chronos *chronos_cria(int nx, int nu, int N, chronos_opcoes op, chronos_restricoes rs,

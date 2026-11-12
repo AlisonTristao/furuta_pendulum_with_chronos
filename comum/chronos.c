@@ -55,6 +55,11 @@ struct chronos {
 };
 
 #define WQ(c, i, j, k) sqrt((c)->wq[(size_t)(k) * (c)->nx + (i)] * (c)->wq[(size_t)(k) * (c)->nx + (j)])
+#ifdef CHRONOS_PERFIL
+long long (*chronos_relogio)(void);
+long long chronos_perfil[12];
+#endif
+
 static real *zeros(size_t n) { return (real *)calloc(n > 0 ? n : 1, sizeof(real)); }
 static real *copia(const real *x, size_t n) { real *y = zeros(n); if (x) memcpy(y, x, n * sizeof(real)); return y; }
 static real dmax(real a, real b) { return a > b ? a : b; }
@@ -692,15 +697,15 @@ int chronos_resolve(chronos *c, const real *s_prev, const real *u_prev, const re
     get_mpc_variables(c, s_prev, u_prev);
     real lambda2 = 1.0;
     while (c->op.eps <= lambda2 * (real)0.5 && continue_Newton && iter < c->op.max_iter) {
-        grad_f0_MPC(c);
-        equality_residuals(c);
-        if (c->ng0 || c->ngk || c->nter) inequality_residuals(c);
-        reduced_KKT_elements(c);
-        riccati_KKT_du(c);
-        if (c->ng0 || c->ngk || c->nter) recover_slacks(c);
-        lambda2 = get_lambda2(c);
-        continue_Newton = line_search_local(c, continue_Newton);
-        get_mpc_variables(c, s_prev, u_prev);
+        CHRONOS_T(0, grad_f0_MPC(c));
+        CHRONOS_T(1, equality_residuals(c));
+        if (c->ng0 || c->ngk || c->nter) CHRONOS_T(2, inequality_residuals(c));
+        CHRONOS_T(3, reduced_KKT_elements(c));
+        CHRONOS_T(4, riccati_KKT_du(c));
+        if (c->ng0 || c->ngk || c->nter) CHRONOS_T(5, recover_slacks(c));
+        CHRONOS_T(6, lambda2 = get_lambda2(c));
+        CHRONOS_T(7, continue_Newton = line_search_local(c, continue_Newton));
+        CHRONOS_T(8, get_mpc_variables(c, s_prev, u_prev));
         iter++;
     }
     if (u0) memcpy(u0, c->u, c->nu * sizeof(real));

@@ -194,12 +194,11 @@ double mpc_passo(mpc *c, const double xd[4], const double refd[4], mpc_info *inf
     mpc_info in = {0, 0, INFINITY, 0, 1};
     real *cu = chronos_u(c->ch), *csu = chronos_su(c->ch), *cs = chronos_s(c->ch);
     for (;;) {
-        dinamica(c, c->P);
+        CHRONOS_T(9, dinamica(c, c->P));
         chronos_dinamica(c->ch, c->A, c->B);
         memcpy(cu, c->U, N * sizeof(real));          /* partida: U atual, su = u, s = rollout */
         memcpy(csu, c->U, N * sizeof(real));
-        rollout(c, x, c->U, cs);
-        chronos_reinicia_folgas(c->ch, x, &c->u_prev);
+        CHRONOS_T(10, rollout(c, x, c->U, cs); chronos_reinicia_folgas(c->ch, x, &c->u_prev));
         real u0;
         in.n_it += chronos_resolve(c->ch, x, &c->u_prev, c->ref, &u0);
         in.n_qp++;
@@ -212,7 +211,7 @@ double mpc_passo(mpc *c, const double xd[4], const double refd[4], mpc_info *inf
             in.dP = INFINITY;
             break;
         }
-        rho_trajetoria(c, x, c->S, c->Pn);
+        CHRONOS_T(11, rho_trajetoria(c, x, c->S, c->Pn));
         real dP = 0;
         for (int i = 0; i < 8 * N; i++) dP = fmax(dP, fabs(c->Pn[i] - c->P[i]));
         in.dP = dP;

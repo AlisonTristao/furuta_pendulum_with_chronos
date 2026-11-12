@@ -11,4 +11,7 @@ if(NOT MPC_OPT)
 endif()
 target_compile_options(${COMPONENT_LIB} PRIVATE ${MPC_OPT} -Werror=double-promotion)
 target_compile_definitions(${COMPONENT_LIB} PUBLIC MPC_OPT_STR="${MPC_OPT}")
+if(DEFINED ENV{MPC_PERFIL})   # MPC_PERFIL=1: perfil de tempo por etapa no bench
+    target_compile_definitions(${COMPONENT_LIB} PUBLIC CHRONOS_PERFIL)
+endif()
 message(STATUS "controlador (componente mpc) compilado com ${MPC_OPT}")

@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "driver/uart.h"
 #include "esp_heap_caps.h"
@@ -47,8 +48,16 @@ static mpc_config config_furuta(int Np, int l_max)
     return c;
 }
 
+#ifdef CHRONOS_PERFIL
+static long long relogio(void) { return esp_timer_get_time(); }
+#endif
+
 static void roda(int Np, int l_max, int64_t *t)
 {
+#ifdef CHRONOS_PERFIL
+    chronos_relogio = relogio;
+    memset(chronos_perfil, 0, sizeof(chronos_perfil));
+#endif
     fisico f = {.m2 = 0.01410, .L1 = 0.09145, .l2 = 0.09008, .I1 = 0.005, .I2 = 4.3796e-05,
                 .mu1 = 0.001, .mu2 = 3.6494e-04, .g = 9.81};
     modelo m = modelo_de_fisico(f, 0.02, 25);
@@ -83,6 +92,15 @@ static void roda(int Np, int l_max, int64_t *t)
         Np, l_max, soma / 1000.0 / PASSOS, t[PASSOS / 2] / 1000.0, t[PASSOS * 99 / 100] / 1000.0,
         t[PASSOS - 1] / 1000.0, (double)it_soma / PASSOS, it_max, t_cria / 1000.0, (unsigned)heap,
         100 * topo / PASSOS, nao_finito);
+#ifdef CHRONOS_PERFIL
+    static const char *nome[12] = {"grad", "res_igual", "res_desig", "KKT", "Riccati", "folgas", "lambda2",
+                                   "busca", "get_var", "ZOH", "rollout", "rho"};
+    long long tot = 0;
+    for (int i = 0; i < 12; i++) tot += chronos_perfil[i];
+    out("        perfil (%% do tempo medido, %.1f ms/passo):", tot / 1000.0 / PASSOS);
+    for (int i = 0; i < 12; i++) out(" %s %.0f", nome[i], 100.0 * chronos_perfil[i] / (tot ? tot : 1));
+    out("\r\n");
+#endif
 }
 
 static void tarefa(void *arg)
