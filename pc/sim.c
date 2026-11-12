@@ -71,6 +71,7 @@ int main(int argc, char **argv)
     mpc_config cfg_eq = config_mpc_equilibrio(&cfg);
     int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), em_eq = 0, n_trocas = 0;
     double u_ant = 0;
+    long volta = 0;                               /* dobramento de θ2 (wrap_theta2) */
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
     FILE *out = livre ? fopen(livre, "w") : NULL;
     if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,eq,theta1_real,theta2_real,dtheta2_real\n");
@@ -86,6 +87,11 @@ int main(int argc, char **argv)
         if (e->estimador) estimador_passo(&est, &m, xm, a_cmd, e->Ts);
         double xc[4] = {xm[0], xm[1], xm[2], xm[3]};   /* compensação do atraso */
         if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
+        if (e->wrap_theta2) {                         /* dobra θ2 com histerese: volta k tal que θ2 - 2πk fique perto de 0 */
+            while (xc[1] - 2 * PI * volta > PI + e->wrap_hist) volta++;
+            while (xc[1] - 2 * PI * volta < -PI - e->wrap_hist) volta--;
+            xc[1] -= 2 * PI * volta;
+        }
         if (troca) {                                  /* swing-up <-> equilíbrio, com histerese */
             int quer = fabs(xc[1]) < (em_eq ? 2 : 1) * e->troca_equilibrio;
             if (quer != em_eq) {

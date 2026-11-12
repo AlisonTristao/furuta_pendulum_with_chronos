@@ -18,7 +18,7 @@ struct mpc {
 
 mpc_config mpc_config_artigo(void)
 {
-    mpc_config c;
+    mpc_config c = {0};
     c.Np = 40;
     c.Q[0] = 10, c.Q[1] = 100, c.Q[2] = 5, c.Q[3] = 1;
     c.Rdu = 100;
@@ -138,6 +138,13 @@ mpc *mpc_cria(const mpc_config *cfg, const modelo *m, const double x0[4], double
     chronos_restricoes rs = {1, 1, 1};
     c->ch = chronos_cria(4, 1, N, cfg->op, rs, Qe, &cfg->Rdu, cfg->terminal_dlqr ? c->Pterm : NULL, smin, smax, qv,
                          qv, &cfg->u_min, &cfg->u_max, &cfg->du_min, &cfg->du_max);
+
+    if (cfg->peso_exp != 0) {                     /* longe da referência no começo, perto no fim */
+        double *w = (double *)malloc(N * sizeof(double));
+        for (int k = 0; k < N; k++) w[k] = exp(cfg->peso_exp * ((k + 1.0) / N - 1.0));
+        chronos_peso_estagio(c->ch, w);
+        free(w);
+    }
 
     /* iterado inicial (build_chronos_mpc): u = u_prev saturado, modelo congelado em x0 */
     double eps = cfg->op.slack_epsilon;

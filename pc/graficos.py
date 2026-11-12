@@ -52,8 +52,10 @@ def metricas(D):
     quedas = sum(1 for a, b in tr if b < len(t) - 1 and t[b] > t_sub)
     pos = t >= t_sub
     m = up & (t > t_sub + 1.0)                     # equilíbrio (sem o primeiro segundo da captura)
+    cap = next((t[a] for a, b in tr if t[b] - t[a] >= 1.0), np.nan)   # 1º trecho de >= 1 s no topo
     return dict(
         subida=t_sub,
+        captura=cap,
         topo=100 * up[pos].mean(),
         maior=maior,
         quedas=quedas,

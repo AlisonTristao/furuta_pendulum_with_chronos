@@ -18,6 +18,7 @@ typedef struct {
     double theta1_min, theta1_max;     /* restrição suave de θ1 */
     double dtheta_max;                 /* restrição suave de |dθ1|, |dθ2| */
     double qv_theta1, qv_dtheta, BIG;  /* pesos L1 das folgas; BIG = "sem limite" em θ2 */
+    double peso_exp;                   /* α: peso do estágio k = exp(α((k+1)/N - 1)); 0 = uniforme */
     int rho_avg;                       /* 1: ρ médio no estágio (trapézio, eq. 13) */
     int terminal_dlqr;                 /* 1: custo terminal DLQR no topo */
     double Ru_lqr;

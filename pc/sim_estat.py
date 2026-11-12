@@ -58,7 +58,7 @@ def main(argv):
         def f(k, fmt):
             v = np.array([r[k] for r in res])
             return f"{fmt.format(np.nanmedian(v))} ({fmt.format(np.nanmin(v))}–{fmt.format(np.nanmax(v))})" if len(v) else "–"
-        print(f"{nome:18s} N={n} não subiu {n - len(res)} | topo {f('topo', '{:.0f}')}% | quedas {f('quedas', '{:.0f}')} | "
+        print(f"{nome:18s} N={n} não subiu {n - len(res)} | 1ª passagem {f('subida', '{:.1f}')} s | captura {f('captura', '{:.1f}')} s | topo {f('topo', '{:.0f}')}% | quedas {f('quedas', '{:.0f}')} | "
               f"rms θ2 {f('rms_t2', '{:.1f}')}° | rms a {f('rms_a', '{:.0f}')} | erro dθ2 {f('erro', '{:.2f}')} | "
               f"rug {f('rug', '{:.1f}')}")
     return 0

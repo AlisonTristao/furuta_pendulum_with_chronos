@@ -78,7 +78,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("mpc", "terminal_dlqr", c->mpc.terminal_dlqr) NUM("mpc", "Ru_lqr", c->mpc.Ru_lqr)
     INT("mpc", "l_max", c->mpc.l_max) NUM("mpc", "eps_rho", c->mpc.eps_rho)
     INT("mpc", "max_iter", c->mpc.op.max_iter) NUM("mpc", "t_barreira", c->mpc.op.t)
-    NUM("mpc", "eps", c->mpc.op.eps)
+    NUM("mpc", "eps", c->mpc.op.eps) NUM("mpc", "peso_exp", c->mpc.peso_exp)
     NUM("mpc", "u_max_equilibrio", c->u_max_eq) NUM("mpc", "Rdu_equilibrio", c->Rdu_eq)
     if (!strcmp(sec, "mpc") && !strcmp(k, "Q")) return lista(v, c->mpc.Q, 4) == 4 ? 0 : -1;
 
@@ -87,7 +87,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "theta1_degrau", c->e.theta1_degrau) NUM("ensaio", "margem_theta1", c->e.margem_theta1)
     INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
-    INT("ensaio", "estimador", c->e.estimador) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
+    INT("ensaio", "estimador", c->e.estimador) INT("ensaio", "wrap_theta2", c->e.wrap_theta2) NUM("ensaio", "wrap_hist", c->e.wrap_hist) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
     NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) NUM("ensaio", "troca_equilibrio", c->e.troca_equilibrio)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;
