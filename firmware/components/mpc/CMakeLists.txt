@@ -1,0 +1,14 @@
+# Controlador compartilhado com o PC (comum/ na raiz do repositório), em float: o ESP32 só tem FPU de precisão
+# simples. Otimização própria (o resto do firmware segue o sdkconfig): MPC_OPT=-O3 no ambiente troca
+# (padrão -O2; faça pio run -t clean antes de trocar).
+set(COMUM ${CMAKE_CURRENT_LIST_DIR}/../../../comum)
+idf_component_register(SRCS ${COMUM}/chronos.c ${COMUM}/qlpv_mpc.c ${COMUM}/modelo.c ${COMUM}/estimador.c
+                       INCLUDE_DIRS ${COMUM})
+target_compile_definitions(${COMPONENT_LIB} PUBLIC REAL_FLOAT)
+set(MPC_OPT "$ENV{MPC_OPT}")
+if(NOT MPC_OPT)
+    set(MPC_OPT "-O2")
+endif()
+target_compile_options(${COMPONENT_LIB} PRIVATE ${MPC_OPT} -Werror=double-promotion)
+target_compile_definitions(${COMPONENT_LIB} PUBLIC MPC_OPT_STR="${MPC_OPT}")
+message(STATUS "controlador (componente mpc) compilado com ${MPC_OPT}")
