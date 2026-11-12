@@ -15,7 +15,7 @@ for i, (k, tit) in enumerate(casos):
         subs.append(f"{M['captura']:.1f} s" if M and M['captura'] == M['captura'] else "não")
         ax[i, 0].plot(t[m], np.degrees(X["theta2"][m]), color=cor, lw=1.1, label=f"ensaio {s}")
         ax[i, 1].plot(t[m], X["theta1"][m], color=cor, lw=1.0)
-    ax[i, 0].set_title(f"{tit}  ·  subida em {', '.join(subs)}", loc="left", fontsize=10)
+    ax[i, 0].set_title(f"{tit}  ·  captura em {', '.join(subs)}", loc="left", fontsize=10)
     ax[i, 0].set_ylim(-400, 400); ax[i, 0].set_yticks(np.arange(-360, 361, 180)); ax[i, 0].set_ylabel("θ2 (graus)", color=G.TEXTO2)
     ax[i, 1].set_ylim(-1.7, 1.7); ax[i, 1].set_ylabel("θ1 (rad)", color=G.TEXTO2)
     for a in ax[i]:
