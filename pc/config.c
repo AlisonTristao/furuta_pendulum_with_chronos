@@ -11,7 +11,7 @@ static void padroes(config *c)
     c->f = (fisico){.m2 = 0.270 / 3, .L1 = 0.170 / 2, .l2 = 0.130, .I1 = 0.005, .I2 = 5.07e-4,
                     .mu1 = 0.001, .mu2 = 0.001, .g = 9.81};
     c->mpc = mpc_config_artigo();
-    c->u_max_eq = c->Rdu_eq = c->du_max_eq = 0;
+    c->u_max_eq = c->Rdu_eq = 0;
     ensaio e = {0};
     e.Ts = 0.02;
     e.duracao = 10;
@@ -26,7 +26,6 @@ static void padroes(config *c)
     e.janela_equilibrio = 0.15;
     e.est_L1 = 0.5;
     e.est_L2 = 20;
-    e.janela_du = 0.3;
     c->e = e;
 }
 
@@ -80,7 +79,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("mpc", "l_max", c->mpc.l_max) NUM("mpc", "eps_rho", c->mpc.eps_rho)
     INT("mpc", "max_iter", c->mpc.op.max_iter) NUM("mpc", "t_barreira", c->mpc.op.t)
     NUM("mpc", "eps", c->mpc.op.eps) NUM("mpc", "peso_exp", c->mpc.peso_exp)
-    NUM("mpc", "du_max_equilibrio", c->du_max_eq) NUM("mpc", "u_max_equilibrio", c->u_max_eq) NUM("mpc", "Rdu_equilibrio", c->Rdu_eq)
+    NUM("mpc", "u_max_equilibrio", c->u_max_eq) NUM("mpc", "Rdu_equilibrio", c->Rdu_eq)
     if (!strcmp(sec, "mpc") && !strcmp(k, "Q")) return lista(v, c->mpc.Q, 4) == 4 ? 0 : -1;
     if (!strcmp(sec, "mpc") && !strcmp(k, "peso_exp_estados")) return lista(v, c->mpc.peso_exp_estados, 4) == 4 ? 0 : -1;
 
@@ -89,7 +88,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "theta1_degrau", c->e.theta1_degrau) NUM("ensaio", "margem_theta1", c->e.margem_theta1)
     INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
-    INT("ensaio", "estimador", c->e.estimador) INT("ensaio", "wrap_theta2", c->e.wrap_theta2) NUM("ensaio", "wrap_hist", c->e.wrap_hist) NUM("ensaio", "janela_du", c->e.janela_du) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
+    INT("ensaio", "estimador", c->e.estimador) INT("ensaio", "wrap_theta2", c->e.wrap_theta2) NUM("ensaio", "wrap_hist", c->e.wrap_hist) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
     NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) NUM("ensaio", "troca_equilibrio", c->e.troca_equilibrio)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;

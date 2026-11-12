@@ -881,12 +881,6 @@ void chronos_dinamica(chronos *c, const double *A, const double *B)
     memcpy(c->B, B, (size_t)c->nx * c->nu * c->N * sizeof(double));
 }
 
-void chronos_limites_du(chronos *c, const double *du_min, const double *du_max)
-{
-    memcpy(c->du_min, du_min, (size_t)c->nu * sizeof(double));
-    memcpy(c->du_max, du_max, (size_t)c->nu * sizeof(double));
-}
-
 void chronos_peso_estagio(chronos *c, const double *w)
 {
     memcpy(c->wq, w, (size_t)c->nx * c->N * sizeof(double));

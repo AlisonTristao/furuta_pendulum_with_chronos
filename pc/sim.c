@@ -71,8 +71,7 @@ int main(int argc, char **argv)
     mpc_config cfg_eq = config_mpc_equilibrio(&cfg);
     int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), em_eq = 0, n_trocas = 0;
     double u_ant = 0;
-    long volta = 0;
-    int em_du = 0, n_trocas_du = 0;               /* du_max_equilibrio */                               /* dobramento de θ2 (wrap_theta2) */
+    long volta = 0;                               /* dobramento de θ2 (wrap_theta2) */
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
     FILE *out = livre ? fopen(livre, "w") : NULL;
     if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,eq,theta1_real,theta2_real,dtheta2_real\n");
@@ -92,15 +91,6 @@ int main(int argc, char **argv)
             while (xc[1] - 2 * PI * volta > PI + e->wrap_hist) volta++;
             while (xc[1] - 2 * PI * volta < -PI - e->wrap_hist) volta--;
             xc[1] -= 2 * PI * volta;
-        }
-        if (cfg.du_max_eq > 0) {                      /* |Δu| limitado perto do topo, com histerese */
-            double th = xc[1] - 2 * PI * floor((xc[1] + PI) / (2 * PI));
-            int quer = fabs(th) < (em_du ? 2 : 1) * e->janela_du;
-            if (quer != em_du) {
-                mpc_limite_du(c, quer ? cfg.du_max_eq : cfg.mpc.du_max);
-                em_du = quer;
-                n_trocas_du++;
-            }
         }
         if (troca) {                                  /* swing-up <-> equilíbrio, com histerese */
             int quer = fabs(xc[1]) < (em_eq ? 2 : 1) * e->troca_equilibrio;
@@ -184,7 +174,6 @@ int main(int argc, char **argv)
     printf("t_calc: médio %.2f ms, máx %.2f ms | QPs por passo: %.2f | máx |θ̈1| = %.1f rad/s²\n", soma_tc / (k ? k : 1), max_tc,
            soma_qp / (k ? k : 1), max_a);
     if (troca) printf("trocas swing-up/equilíbrio: %d\n", n_trocas);
-    if (cfg.du_max_eq > 0) printf("|Δu| ≤ %g perto do topo: %d trocas\n", cfg.du_max_eq, n_trocas_du);
     if (out) fclose(out);
     mpc_libera(c);
     return 0;

@@ -179,8 +179,7 @@ int main(int argc, char **argv)
     int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), n_trocas = 0;
     int em_eq = troca && e->equilibrio;
     double u_ant = 0;
-    long volta = 0;
-    int em_du = 0, n_trocas_du = 0;               /* du_max_equilibrio */                               /* dobramento de θ2 (wrap_theta2) */
+    long volta = 0;                               /* dobramento de θ2 (wrap_theta2) */
     mpc *c = mpc_cria(em_eq ? &cfg_eq : &cfg.mpc, &m, x, 0.0);
     FILE *out = fopen(arq, "w");
     if (!out) {
@@ -219,15 +218,6 @@ int main(int argc, char **argv)
             while (xc[1] - 2 * PI * volta > PI + e->wrap_hist) volta++;
             while (xc[1] - 2 * PI * volta < -PI - e->wrap_hist) volta--;
             xc[1] -= 2 * PI * volta;
-        }
-        if (cfg.du_max_eq > 0) {                      /* |Δu| limitado perto do topo, com histerese */
-            double th = xc[1] - 2 * PI * floor((xc[1] + PI) / (2 * PI));
-            int quer = fabs(th) < (em_du ? 2 : 1) * e->janela_du;
-            if (quer != em_du) {
-                mpc_limite_du(c, quer ? cfg.du_max_eq : cfg.mpc.du_max);
-                em_du = quer;
-                n_trocas_du++;
-            }
         }
         if (troca) {                                  /* swing-up <-> equilíbrio, com histerese */
             int quer = fabs(xc[1]) < (em_eq ? 2 : 1) * e->troca_equilibrio;
@@ -275,7 +265,6 @@ int main(int argc, char **argv)
                "| maior atraso do período: %.2f ms\n",
                soma_calc / k, max_calc, soma_ciclo / k, max_ciclo, estouros, max_atraso);
     if (troca) printf("trocas swing-up/equilíbrio: %d\n", n_trocas);
-    if (cfg.du_max_eq > 0) printf("|Δu| ≤ %g perto do topo: %d trocas\n", cfg.du_max_eq, n_trocas_du);
     printf("dados: %s\n", arq);
     mpc_libera(c);
     periodo_libera(p);

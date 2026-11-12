@@ -163,19 +163,6 @@ mpc *mpc_cria(const mpc_config *cfg, const modelo *m, const double x0[4], double
     return c;
 }
 
-void mpc_limite_du(mpc *c, double du_max)
-{
-    c->cfg.du_min = -du_max, c->cfg.du_max = du_max;
-    chronos_limites_du(c->ch, &c->cfg.du_min, &c->cfg.du_max);
-    /* projeta o U do warm start nos limites novos (o ponto interior precisa partir viável) */
-    double e = c->cfg.op.slack_epsilon, up = c->u_prev;
-    for (int k = 0; k < c->N; k++) {
-        double v = fmin(fmax(c->U[k], up - du_max + e), up + du_max - e);
-        v = fmin(fmax(v, c->cfg.u_min + e), c->cfg.u_max - e);
-        c->U[k] = up = v;
-    }
-}
-
 void mpc_libera(mpc *c)
 {
     if (!c) return;
