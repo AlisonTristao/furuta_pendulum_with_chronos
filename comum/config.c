@@ -7,9 +7,10 @@
 
 static void padroes(config *c)
 {
-    /* pêndulo do artigo (ICIT 27) */
-    c->f = (fisico){.m2 = 0.270 / 3, .L1 = 0.170 / 2, .l2 = 0.130, .I1 = 0.005, .I2 = 5.07e-4,
-                    .mu1 = 0.001, .mu2 = 0.001, .g = 9.81};
+    /* pêndulo real com o suporte novo, efetivos da regressão (regressao.py, 12/11/2026); I1 e mu1 = braço virtual
+     * do artigo. O pêndulo do artigo (ICIT 27) está em artigo.ini. */
+    c->f = (fisico){.m2 = 0.01410, .L1 = 0.0791, .l2 = 0.1078, .I1 = 0.005, .I2 = 1.9036e-05,
+                    .mu1 = 0.001, .mu2 = 1.4094e-04, .g = 9.81};
     c->mpc = mpc_config_artigo();
     ensaio e = {0};
     e.Ts = 0.02;
@@ -25,6 +26,8 @@ static void padroes(config *c)
     e.janela_equilibrio = 0.15;
     e.est_L1 = 0.5;
     e.est_L2 = 20;
+    e.impulso_a = 80;
+    e.impulso_ms = 200;
     c->e = e;
 }
 
