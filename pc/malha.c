@@ -120,6 +120,19 @@ int main(int argc, char **argv)
     printf("   θ2 = %.3f (pi = embaixo)\n", x[1]);
     espera_enter("2) Enter para começar: homing e, em seguida, o controle (Ctrl+C para parar)... ");
 
+    {   /* rampa da aceleração no firmware (R<ms>); firmware antigo responde ERR,CMD */
+        char cmd[16];
+        int rm = (int)lround(e->rampa_ms);
+        snprintf(cmd, sizeof(cmd), "R%d", rm);
+        if (furuta_comando(f, cmd, r, sizeof(r), 300) == FURUTA_OK && !strncmp(r, "OK", 2)) {
+            printf("rampa da aceleração no firmware: %d ms\n", rm);
+        } else if (rm > 0) {
+            fprintf(stderr, "o firmware não aceitou a rampa (%s): grave o firmware novo\n", r);
+            encerra(f);
+            return 1;
+        }
+    }
+
     /* homing: limite de θ1. Daqui em diante sempre há comando a cada <= 20 ms (o driver não desliga) */
     signal(SIGINT, ao_ctrl_c);
     printf("homing (o braço vai até os dois fins de curso e volta ao meio)...\n");
@@ -198,6 +211,7 @@ int main(int argc, char **argv)
     estimador est;
     estimador_cria(&est, e->est_L1, e->est_L2);
     estimador_topo(&est, e->est_L1_topo, e->est_L2_topo, e->est_janela);
+    estimador_rampa(&est, e->rampa_ms * 1e-3);
     double a_cmd = 0;                                  /* último comando enviado (em espera foi 0) */
     double t0 = periodo_agora();
     for (k = 0; k < K && !g_parar; k++) {

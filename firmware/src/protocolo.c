@@ -100,6 +100,13 @@ static void executa(char *linha)
         envia("%s", buf);
         break;
     }
+    case 'R': {                              // R<ms>: rampa da aceleração a cada comando (0 = degrau); R: consulta
+        char *fim;
+        long ms = linha[1] ? strtol(linha + 1, &fim, 10) : controle_rampa_ms();
+        if (linha[1] && (fim == linha + 1 || !controle_rampa((int)ms))) envia("ERR,RAMPA");
+        else envia("OK,%d", controle_rampa_ms());
+        break;
+    }
     case 'E':
         if (linha[1] == '0' || linha[1] == '1') {
             controle_habilita(linha[1] == '1');

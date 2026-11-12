@@ -56,6 +56,7 @@ int main(int argc, char **argv)
     estimador est;
     estimador_cria(&est, e->est_L1, e->est_L2);
     estimador_topo(&est, e->est_L1_topo, e->est_L2_topo, e->est_janela);
+    estimador_rampa(&est, e->rampa_ms * 1e-3);
     double a_cmd = 0;                             /* último comando enviado */
     double xm[4] = {x[0], x[1], x[2], x[3]};      /* o que o controle vê */
     double th_est = x[1], w_est = x[3], fila[256] = {0};   /* fila: comando por ms (atraso) */
@@ -73,7 +74,8 @@ int main(int argc, char **argv)
     int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), em_eq = 0, n_trocas = 0;
     double u_ant = 0;
     long volta = 0;
-    double off_th2 = 0;                           /* offset de θ2 estimado (offset_tau) */                               /* dobramento de θ2 (wrap_theta2) */
+    double off_th2 = 0;
+    double a_fila = 0;                            /* último comando posto na fila (rampa_ms) */                           /* offset de θ2 estimado (offset_tau) */                               /* dobramento de θ2 (wrap_theta2) */
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
     FILE *out = livre ? fopen(livre, "w") : NULL;
     if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,eq,theta1_real,theta2_real,dtheta2_real,off_th2\n");
@@ -138,7 +140,10 @@ int main(int argc, char **argv)
         double ad = a + (ud - u) * 200;           /* distúrbio de torque ~ em aceleração (aprox.) */
         int nms = (int)lround(e->Ts * 1e3), nat = (int)lround(e->atraso_ms);
         if (nat > 200) nat = 200;
-        for (int j = 0; j < nms; j++) fila[(tms + nat + j) & 255] = ad;
+        int nr = (int)lround(e->rampa_ms);           /* rampa do firmware: do comando anterior ao novo em nr ms */
+        for (int j = 0; j < nms; j++)
+            fila[(tms + nat + j) & 255] = j < nr ? a_fila + (ad - a_fila) * (j + 1.0) / nr : ad;
+        a_fila = ad;
         for (int j = 0; j < nms; j++) {
             /* malha de 1 kHz do firmware (malha_rodando): satura a, integra v, freia antes do limite, satura v */
             double ac = fila[tms++ & 255], v0 = v_fw;
