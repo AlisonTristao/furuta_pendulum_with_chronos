@@ -19,3 +19,6 @@ pc/*.exe
 pc/*.csv
 pc/ensaios/
 pc/obj_f/
+
+# Editor
+.vscode/
