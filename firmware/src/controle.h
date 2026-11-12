@@ -22,8 +22,6 @@ bool controle_falha_driver(void);
 
 // Comando da malha externa: aceleração do braço (rad/s²). Só aceito em PRONTO/RODANDO.
 bool controle_acel(float a);
-bool controle_rampa(int ms);       // rampa da aceleração a cada comando novo, 0..20 ms (0 = degrau)
-int controle_rampa_ms(void);
 bool controle_homing(void);   // inicia o homing (liga o driver); false se não for possível agora
 void controle_origem_aqui(void);   // theta1 = 0 na posição atual, limite ±LIM_SEM_HOMING_RAD (bancada)
 void controle_zera_pendulo(void);  // pêndulo parado embaixo: theta2 = pi

@@ -3,7 +3,7 @@
  *   sim.exe <config.ini> [saida.csv]
  *
  * CSV: t, θ1, θ2, dθ1, dθ2 (o que o controle viu, como no malha.c), θ1_ref, u (torque), a (θ̈1 comandado), n_qp, n_it,
- *      dP, t_calc_ms, eq, e o estado verdadeiro: theta1_real, theta2_real, dtheta2_real */
+ *      dP, t_calc_ms e o estado verdadeiro: theta1_real, theta2_real, dtheta2_real */
 #include "config.h"
 #include "estimador.h"
 #include "modelo.h"
@@ -55,8 +55,6 @@ int main(int argc, char **argv)
     }
     estimador est;
     estimador_cria(&est, e->est_L1, e->est_L2);
-    estimador_topo(&est, e->est_L1_topo, e->est_L2_topo, e->est_janela);
-    estimador_rampa(&est, e->rampa_ms * 1e-3);
     double a_cmd = 0;                             /* último comando enviado */
     double xm[4] = {x[0], x[1], x[2], x[3]};      /* o que o controle vê */
     double th_est = x[1], w_est = x[3], fila[256] = {0};   /* fila: comando por ms (atraso) */
@@ -70,15 +68,9 @@ int main(int argc, char **argv)
         printf("motor: %g passos/volta | a ≤ %g, v ≤ %g, limite de software ±%g rad (0 = sem) | ressonância %g Hz, ζ %g\n",
                e->passos_rev, e->a_max_fw, e->v_max_fw, e->limite_fw, e->f_motor, e->zeta_motor);
     }
-    mpc_config cfg_eq = config_mpc_equilibrio(&cfg);
-    int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), em_eq = 0, n_trocas = 0;
-    double u_ant = 0;
-    long volta = 0;
-    double off_th2 = 0;
-    double a_fila = 0;                            /* último comando posto na fila (rampa_ms) */                           /* offset de θ2 estimado (offset_tau) */                               /* dobramento de θ2 (wrap_theta2) */
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
     FILE *out = livre ? fopen(livre, "w") : NULL;
-    if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,eq,theta1_real,theta2_real,dtheta2_real,off_th2\n");
+    if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,theta1_real,theta2_real,dtheta2_real\n");
 
     int K = (int)lround(e->duracao / e->Ts);
     double t_up = -1, soma_tc = 0, max_tc = 0, soma_qp = 0, max_a = 0;
@@ -88,33 +80,10 @@ int main(int argc, char **argv)
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
         double t0 = periodo_agora();
-        if (e->offset_tau > 0) {                      /* offset do zero de θ2: no equilíbrio a média do θ2 é o offset */
-            xm[1] -= off_th2;
-            double th = xm[1] - 2 * PI * floor((xm[1] + PI) / (2 * PI));
-            if (fabs(th) < e->offset_janela) {
-                off_th2 += e->Ts / e->offset_tau * th;
-                off_th2 = fmax(-e->offset_max, fmin(e->offset_max, off_th2));
-            }
-        }
         if (e->estimador) estimador_passo(&est, &m, xm, a_cmd, e->Ts);
         double xc[4] = {xm[0], xm[1], xm[2], xm[3]};   /* compensação do atraso */
         if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
-        if (e->wrap_theta2) {                         /* dobra θ2 com histerese: volta k tal que θ2 - 2πk fique perto de 0 */
-            while (xc[1] - 2 * PI * volta > PI + e->wrap_hist) volta++;
-            while (xc[1] - 2 * PI * volta < -PI - e->wrap_hist) volta--;
-            xc[1] -= 2 * PI * volta;
-        }
-        if (troca) {                                  /* swing-up <-> equilíbrio, com histerese */
-            int quer = fabs(xc[1]) < (em_eq ? 2 : 1) * e->troca_equilibrio;
-            if (quer != em_eq) {
-                mpc_libera(c);
-                c = mpc_cria(quer ? &cfg_eq : &cfg.mpc, &m, xc, u_ant);
-                em_eq = quer;
-                n_trocas++;
-            }
-        }
         double u = mpc_passo(c, xc, ref, &in);
-        u_ant = u;
         double tc = (periodo_agora() - t0) * 1e3;
         double a = modelo_acel_braco(&m, xc, u);
         a_cmd = a;
@@ -123,8 +92,8 @@ int main(int argc, char **argv)
         soma_qp += in.n_qp;
         max_a = fmax(max_a, fabs(a));
         if (out)
-            fprintf(out, "%.4f,%.10g,%.10g,%.10g,%.10g,%.6g,%.12g,%.8g,%d,%d,%.3e,%.4f,%d,%.10g,%.10g,%.10g,%.6g\n", t, xm[0],
-                    xm[1], xm[2], xm[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tc, em_eq, x[0], x[1], x[3], off_th2);
+            fprintf(out, "%.4f,%.10g,%.10g,%.10g,%.10g,%.6g,%.12g,%.8g,%d,%d,%.3e,%.4f,%.10g,%.10g,%.10g\n", t, xm[0],
+                    xm[1], xm[2], xm[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tc, x[0], x[1], x[3]);
         if (t_up < 0 && fabs(wrap(x[1])) < 0.1 && fabs(x[3]) < 0.5) t_up = t;
         if (!in.finito) {
             printf("controle não finito em t = %.2f s\n", t);
@@ -140,10 +109,7 @@ int main(int argc, char **argv)
         double ad = a + (ud - u) * 200;           /* distúrbio de torque ~ em aceleração (aprox.) */
         int nms = (int)lround(e->Ts * 1e3), nat = (int)lround(e->atraso_ms);
         if (nat > 200) nat = 200;
-        int nr = (int)lround(e->rampa_ms);           /* rampa do firmware: do comando anterior ao novo em nr ms */
-        for (int j = 0; j < nms; j++)
-            fila[(tms + nat + j) & 255] = j < nr ? a_fila + (ad - a_fila) * (j + 1.0) / nr : ad;
-        a_fila = ad;
+        for (int j = 0; j < nms; j++) fila[(tms + nat + j) & 255] = ad;
         for (int j = 0; j < nms; j++) {
             /* malha de 1 kHz do firmware (malha_rodando): satura a, integra v, freia antes do limite, satura v */
             double ac = fila[tms++ & 255], v0 = v_fw;
@@ -173,7 +139,6 @@ int main(int argc, char **argv)
             /* θ1 medido = passos inteiros (acumulador do gerador de passos trunca); dθ1 = velocidade comandada */
             th1_med = ppr > 0 ? floor(th1c * ppr) / ppr : th1c;
             double ang = x[1] + (e->ruido_enc > 0 ? e->ruido_enc * q * gauss() : 0);
-            ang += e->offset_enc;                       /* zero do encoder fora da vertical */
             double med = q > 0 ? q * floor(ang / q) : ang;
             if (e->obs_hz > 0) {
                 double wn = 2 * PI * e->obs_hz, er = med - th_est;
@@ -189,7 +154,6 @@ int main(int argc, char **argv)
            x[1], x[2], x[3]);
     printf("t_calc: médio %.2f ms, máx %.2f ms | QPs por passo: %.2f | máx |θ̈1| = %.1f rad/s²\n", soma_tc / (k ? k : 1), max_tc,
            soma_qp / (k ? k : 1), max_a);
-    if (troca) printf("trocas swing-up/equilíbrio: %d\n", n_trocas);
     if (out) fclose(out);
     mpc_libera(c);
     return 0;

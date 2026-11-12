@@ -120,19 +120,6 @@ int main(int argc, char **argv)
     printf("   θ2 = %.3f (pi = embaixo)\n", x[1]);
     espera_enter("2) Enter para começar: homing e, em seguida, o controle (Ctrl+C para parar)... ");
 
-    {   /* rampa da aceleração no firmware (R<ms>); firmware antigo responde ERR,CMD */
-        char cmd[16];
-        int rm = (int)lround(e->rampa_ms);
-        snprintf(cmd, sizeof(cmd), "R%d", rm);
-        if (furuta_comando(f, cmd, r, sizeof(r), 300) == FURUTA_OK && !strncmp(r, "OK", 2)) {
-            printf("rampa da aceleração no firmware: %d ms\n", rm);
-        } else if (rm > 0) {
-            fprintf(stderr, "o firmware não aceitou a rampa (%s): grave o firmware novo\n", r);
-            encerra(f);
-            return 1;
-        }
-    }
-
     /* homing: limite de θ1. Daqui em diante sempre há comando a cada <= 20 ms (o driver não desliga) */
     signal(SIGINT, ao_ctrl_c);
     printf("homing (o braço vai até os dois fins de curso e volta ao meio)...\n");
@@ -188,20 +175,14 @@ int main(int argc, char **argv)
     x[1] -= off2;
 
     modelo m = modelo_de_fisico(cfg.f, e->Ts, cfg.mpc.dtheta_max);
-    mpc_config cfg_eq = config_mpc_equilibrio(&cfg);   /* depois do homing: já com o limite de θ1 */
-    int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), n_trocas = 0;
-    int em_eq = troca && e->equilibrio;
-    double u_ant = 0;
-    long volta = 0;
-    double off_th2 = 0;                           /* offset de θ2 estimado (offset_tau) */                               /* dobramento de θ2 (wrap_theta2) */
-    mpc *c = mpc_cria(em_eq ? &cfg_eq : &cfg.mpc, &m, x, 0.0);
+    mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
     FILE *out = fopen(arq, "w");
     if (!out) {
         fprintf(stderr, "não abriu %s\n", arq);
         encerra(f);
         return 1;
     }
-    fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,t_ciclo_ms,atraso_ms,eq,off_th2\n");
+    fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,t_ciclo_ms,atraso_ms\n");
 
     periodo_prioridade_alta();
     periodo *p = periodo_cria(e->Ts);
@@ -210,8 +191,6 @@ int main(int argc, char **argv)
     const char *motivo = "fim da duração";
     estimador est;
     estimador_cria(&est, e->est_L1, e->est_L2);
-    estimador_topo(&est, e->est_L1_topo, e->est_L2_topo, e->est_janela);
-    estimador_rampa(&est, e->rampa_ms * 1e-3);
     double a_cmd = 0;                                  /* último comando enviado (em espera foi 0) */
     double t0 = periodo_agora();
     for (k = 0; k < K && !g_parar; k++) {
@@ -224,36 +203,13 @@ int main(int argc, char **argv)
             break;
         }
         x[1] -= off2;
-        if (e->offset_tau > 0) {                      /* offset do zero de θ2: no equilíbrio a média do θ2 é o offset */
-            x[1] -= off_th2;
-            double th = x[1] - 2 * PI * floor((x[1] + PI) / (2 * PI));
-            if (fabs(th) < e->offset_janela) {
-                off_th2 += e->Ts / e->offset_tau * th;
-                off_th2 = fmax(-e->offset_max, fmin(e->offset_max, off_th2));
-            }
-        }
         if (e->estimador) estimador_passo(&est, &m, x, a_cmd, e->Ts);   /* x[3] passa a ser o estimado */
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
         double tc0 = periodo_agora();
         double xc[4] = {x[0], x[1], x[2], x[3]};    /* compensação do atraso: estado daqui a comp_atraso_ms */
         if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
-        if (e->wrap_theta2) {                         /* dobra θ2 com histerese: volta k tal que θ2 - 2πk fique perto de 0 */
-            while (xc[1] - 2 * PI * volta > PI + e->wrap_hist) volta++;
-            while (xc[1] - 2 * PI * volta < -PI - e->wrap_hist) volta--;
-            xc[1] -= 2 * PI * volta;
-        }
-        if (troca) {                                  /* swing-up <-> equilíbrio, com histerese */
-            int quer = fabs(xc[1]) < (em_eq ? 2 : 1) * e->troca_equilibrio;
-            if (quer != em_eq) {
-                mpc_libera(c);
-                c = mpc_cria(quer ? &cfg_eq : &cfg.mpc, &m, xc, u_ant);
-                em_eq = quer;
-                n_trocas++;
-            }
-        }
         double u = mpc_passo(c, xc, ref, &in);
-        u_ant = u;
         double tcalc = (periodo_agora() - tc0) * 1e3;
         if (!in.finito) {
             motivo = "controle não finito";
@@ -264,8 +220,8 @@ int main(int argc, char **argv)
         double xa[4];
         st = furuta_acel(f, a, xa, 10);
         double tciclo = (periodo_agora() - ti) * 1e3;
-        fprintf(out, "%.4f,%.6f,%.6f,%.5f,%.5f,%.5f,%.6f,%.4f,%d,%d,%.3e,%.4f,%.4f,%.4f,%d,%.6f\n", t, x[0], x[1], x[2],
-                x[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tcalc, tciclo, atraso, em_eq, off_th2);
+        fprintf(out, "%.4f,%.6f,%.6f,%.5f,%.5f,%.5f,%.6f,%.4f,%d,%d,%.3e,%.4f,%.4f,%.4f\n", t, x[0], x[1], x[2],
+                x[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tcalc, tciclo, atraso);
         if (st != FURUTA_OK) {
             motivo = st == FURUTA_ERR ? "o firmware recusou o comando (ver estado)" : "envio do comando falhou";
             break;
@@ -288,7 +244,6 @@ int main(int argc, char **argv)
         printf("MPC: %.2f ms médio, %.2f ms máx | ciclo (X + MPC + envio): %.2f ms médio, %.2f ms máx, %d acima de Ts "
                "| maior atraso do período: %.2f ms\n",
                soma_calc / k, max_calc, soma_ciclo / k, max_ciclo, estouros, max_atraso);
-    if (troca) printf("trocas swing-up/equilíbrio: %d\n", n_trocas);
     printf("dados: %s\n", arq);
     mpc_libera(c);
     periodo_libera(p);

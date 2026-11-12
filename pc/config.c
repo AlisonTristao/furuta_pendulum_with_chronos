@@ -11,7 +11,6 @@ static void padroes(config *c)
     c->f = (fisico){.m2 = 0.270 / 3, .L1 = 0.170 / 2, .l2 = 0.130, .I1 = 0.005, .I2 = 5.07e-4,
                     .mu1 = 0.001, .mu2 = 0.001, .g = 9.81};
     c->mpc = mpc_config_artigo();
-    c->u_max_eq = c->Rdu_eq = 0;
     ensaio e = {0};
     e.Ts = 0.02;
     e.duracao = 10;
@@ -24,8 +23,6 @@ static void padroes(config *c)
     e.usa_limite_homing = 1;
     e.theta2_aborta = 60;
     e.janela_equilibrio = 0.15;
-    e.offset_janela = 0.15;
-    e.offset_max = 0.035;
     e.est_L1 = 0.5;
     e.est_L2 = 20;
     c->e = e;
@@ -81,7 +78,6 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("mpc", "l_max", c->mpc.l_max) NUM("mpc", "eps_rho", c->mpc.eps_rho)
     INT("mpc", "max_iter", c->mpc.op.max_iter) NUM("mpc", "t_barreira", c->mpc.op.t)
     NUM("mpc", "eps", c->mpc.op.eps) NUM("mpc", "peso_exp", c->mpc.peso_exp)
-    NUM("mpc", "u_max_equilibrio", c->u_max_eq) NUM("mpc", "Rdu_equilibrio", c->Rdu_eq)
     if (!strcmp(sec, "mpc") && !strcmp(k, "Q")) return lista(v, c->mpc.Q, 4) == 4 ? 0 : -1;
     if (!strcmp(sec, "mpc") && !strcmp(k, "peso_exp_estados")) return lista(v, c->mpc.peso_exp_estados, 4) == 4 ? 0 : -1;
 
@@ -90,11 +86,8 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "theta1_degrau", c->e.theta1_degrau) NUM("ensaio", "margem_theta1", c->e.margem_theta1)
     INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
-    INT("ensaio", "estimador", c->e.estimador) INT("ensaio", "wrap_theta2", c->e.wrap_theta2) NUM("ensaio", "wrap_hist", c->e.wrap_hist) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
-    NUM("ensaio", "est_L1_topo", c->e.est_L1_topo) NUM("ensaio", "est_L2_topo", c->e.est_L2_topo) NUM("ensaio", "est_janela", c->e.est_janela)
-    NUM("ensaio", "rampa_ms", c->e.rampa_ms) NUM("ensaio", "offset_tau", c->e.offset_tau) NUM("ensaio", "offset_janela", c->e.offset_janela)
-    NUM("ensaio", "offset_max", c->e.offset_max) NUM("sim", "offset_enc", c->e.offset_enc)
-    NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) NUM("ensaio", "troca_equilibrio", c->e.troca_equilibrio)
+    INT("ensaio", "estimador", c->e.estimador) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
+    NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;
         c->e.equilibrio = !strcmp(v, "equilibrio");
@@ -177,14 +170,6 @@ int config_le(const char *arquivo, config *c)
     return erros ? -1 : 0;
 }
 
-mpc_config config_mpc_equilibrio(const config *c)
-{
-    mpc_config m = c->mpc;
-    if (c->u_max_eq > 0) m.u_min = -c->u_max_eq, m.u_max = c->u_max_eq;
-    if (c->Rdu_eq > 0) m.Rdu = c->Rdu_eq;
-    return m;
-}
-
 int config_arg(config *c, const char *arg)
 {
     char b[160];
@@ -226,8 +211,6 @@ void config_imprime(const config *c)
     printf("mpc: Ts=%g Np=%d Q=(%g,%g,%g,%g) Rdu=%g u=[%g,%g] du=[%g,%g] theta1=[%g,%g] dtheta<=%g qv=(%g,%g)\n",
            c->e.Ts, m->Np, m->Q[0], m->Q[1], m->Q[2], m->Q[3], m->Rdu, m->u_min, m->u_max, m->du_min, m->du_max,
            m->theta1_min, m->theta1_max, m->dtheta_max, m->qv_theta1, m->qv_dtheta);
-    if (c->u_max_eq > 0 || c->Rdu_eq > 0)
-        printf("equilíbrio: u=±%g Rdu=%g (troca em |θ2| < %g rad)\n", c->u_max_eq, c->Rdu_eq, c->e.troca_equilibrio);
     printf("     rho_avg=%d terminal_dlqr=%d l_max=%d eps_rho=%g max_iter=%d t=%g\n", m->rho_avg, m->terminal_dlqr,
            m->l_max, m->eps_rho, m->op.max_iter, m->op.t);
 }

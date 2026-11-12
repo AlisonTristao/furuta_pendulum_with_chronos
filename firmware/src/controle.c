@@ -24,8 +24,6 @@ static volatile float s_meio_curso = 0.0f, s_limite = 0.0f;
 static volatile float s_a_cmd = 0.0f;
 static volatile int64_t s_t_cmd = 0;
 static volatile bool s_novo_cmd = false;
-static volatile bool s_nova_rampa = false;   // comando novo: a rampa recomeça do valor aplicado
-static volatile int s_rampa_ms = 0;          // 0 = degrau (a aceleração muda de uma vez)
 static volatile bool s_ped_homing, s_ped_origem, s_ped_zera;
 static volatile int s_ped_hab = -1;
 static volatile bool s_pronto_init = false;
@@ -35,9 +33,6 @@ static float s_v = 0.0f;               // velocidade comandada do braço (rad/s)
 static int64_t s_t_pronto = 0;         // última vez que a malha não estava em PRONTO (us)
 static int32_t s_offset = 0;           // passos em theta1 = 0
 static int s_erros_enc = 0;
-static float s_a_ap = 0.0f;            // aceleração aplicada (com a rampa)
-static float s_a_ini = 0.0f;           // valor aplicado quando chegou o comando
-static int s_k_rampa = 0;              // ms desde o comando
 
 typedef struct {
     gpio_num_t pino;
@@ -77,19 +72,7 @@ static void falha(const char *msg)
 // Integra a aceleração pedida, freando antes dos limites de software (distância de parada com A_MAX).
 static float malha_rodando(float theta1, float dt)
 {
-    // rampa: do valor aplicado até o comando novo em s_rampa_ms ms (0 = degrau)
-    if (s_nova_rampa) {
-        s_nova_rampa = false;
-        s_a_ini = s_a_ap;
-        s_k_rampa = 0;
-    }
     float a = s_a_cmd;
-    int r = s_rampa_ms;
-    if (r > 0 && s_k_rampa < r) {
-        s_k_rampa++;
-        a = s_a_ini + (a - s_a_ini) * (float)s_k_rampa / (float)r;
-    }
-    s_a_ap = a;
     if (a > A_MAX) a = A_MAX;
     if (a < -A_MAX) a = -A_MAX;
     float v = s_v + a * dt;
@@ -218,8 +201,6 @@ static void tarefa(void *arg)
             s_v = 0.0f;
             break;
         }
-        if (s_estado != EST_RODANDO) s_a_ap = 0.0f;   // a próxima rampa parte de zero
-
         // chave acionada fora do homing = os limites de software falharam
         if ((s_estado == EST_RODANDO || s_estado == EST_PRONTO) && (fneg || fpos))
             falha(fneg ? "FIM_DE_CURSO_NEG" : "FIM_DE_CURSO_POS");
@@ -269,19 +250,9 @@ bool controle_acel(float a)
     if (e != EST_PRONTO && e != EST_RODANDO) return false;
     s_a_cmd = a;
     s_t_cmd = esp_timer_get_time();
-    s_nova_rampa = true;
     s_novo_cmd = true;                    // a malha passa de PRONTO para RODANDO
     return true;
 }
-
-bool controle_rampa(int ms)
-{
-    if (ms < 0 || ms > 1000 / 50) return false;   // até um período da malha externa (20 ms)
-    s_rampa_ms = ms;
-    return true;
-}
-
-int controle_rampa_ms(void) { return s_rampa_ms; }
 
 bool controle_homing(void)
 {
