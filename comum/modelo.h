@@ -32,5 +32,7 @@ void modelo_passo_acel(const modelo *m, double x[4], double a, double h, int nsu
 void modelo_rho(const modelo *m, const real x[4], real r[8]);
 /* (A, B) de um estágio por ZOH (eq. 13): A 4×4 (coluna), B 4. r na escala de Ts. */
 void modelo_zoh(const modelo *m, const real r[8], real A[16], real B[4]);
+/* Idem com passo h (r continua na escala de Ts): estágios de duração diferente no horizonte. */
+void modelo_zoh_h(const modelo *m, const real r[8], real h, real A[16], real B[4]);
 
 #endif

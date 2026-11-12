@@ -77,7 +77,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("mpc", "terminal_dlqr", c->mpc.terminal_dlqr) NUM("mpc", "Ru_lqr", c->mpc.Ru_lqr)
     INT("mpc", "l_max", c->mpc.l_max) NUM("mpc", "eps_rho", c->mpc.eps_rho)
     INT("mpc", "max_iter", c->mpc.op.max_iter) NUM("mpc", "t_barreira", c->mpc.op.t)
-    NUM("mpc", "eps", c->mpc.op.eps) NUM("mpc", "peso_exp", c->mpc.peso_exp)
+    NUM("mpc", "eps", c->mpc.op.eps) NUM("mpc", "peso_exp", c->mpc.peso_exp) NUM("mpc", "horizonte", c->mpc.horizonte)
     if (!strcmp(sec, "mpc") && (!strcmp(k, "Q") || !strcmp(k, "peso_exp_estados"))) {
         double t[4];
         if (lista(v, t, 4) != 4) return -1;
@@ -216,6 +216,11 @@ void config_imprime(const config *c)
     printf("mpc: Ts=%g Np=%d Q=(%g,%g,%g,%g) Rdu=%g u=[%g,%g] du=[%g,%g] theta1=[%g,%g] dtheta<=%g qv=(%g,%g)\n",
            c->e.Ts, m->Np, m->Q[0], m->Q[1], m->Q[2], m->Q[3], m->Rdu, m->u_min, m->u_max, m->du_min, m->du_max,
            m->theta1_min, m->theta1_max, m->dtheta_max, m->qv_theta1, m->qv_dtheta);
+    if (m->horizonte > m->Np * c->e.Ts) {
+        double inc = 2 * (m->horizonte - m->Np * c->e.Ts) / ((double)m->Np * (m->Np - 1));
+        printf("passo variável: horizonte %g s em %d estágios, h = %g ms + k·%.3g ms (último %.1f ms)\n", (double)m->horizonte,
+               m->Np, c->e.Ts * 1e3, inc * 1e3, (c->e.Ts + (m->Np - 1) * inc) * 1e3);
+    }
     printf("     rho_avg=%d terminal_dlqr=%d l_max=%d eps_rho=%g max_iter=%d t=%g\n", m->rho_avg, m->terminal_dlqr,
            m->l_max, m->eps_rho, m->op.max_iter, m->op.t);
 }

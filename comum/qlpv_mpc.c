@@ -13,6 +13,7 @@ struct mpc {
     real *U, *S;          /* predição: U (N), S (4×N) */
     real *P, *Pn;         /* trajetória dos ρ: 8×N (coluna j = estágio j) */
     real *A, *B, *ref;    /* 4×4×N, 4×N, 4×N */
+    real *h, *T;            /* duração do estágio k e instante do fim do estágio k (N); NULL = uniforme */
     real Pterm[16];
 };
 
@@ -45,7 +46,8 @@ static void dinamica(mpc *c, const real *P)
         int jn = j + 1 < c->N ? j + 1 : j;
         for (int i = 0; i < 8; i++)
             r[i] = c->cfg.rho_avg ? (real)0.5 * (P[j * 8 + i] + P[jn * 8 + i]) : P[j * 8 + i];
-        modelo_zoh(&c->m, r, c->A + 16 * j, c->B + 4 * j);
+        if (c->h) modelo_zoh_h(&c->m, r, c->h[j], c->A + 16 * j, c->B + 4 * j);
+        else modelo_zoh(&c->m, r, c->A + 16 * j, c->B + 4 * j);
     }
 }
 
@@ -62,6 +64,33 @@ static void rollout(const mpc *c, const real x[4], const real *U, real *s)
         }
         memcpy(xk, t, sizeof(xk));
         memcpy(s + 4 * k, xk, sizeof(xk));
+    }
+}
+
+/* Warm start com passo variável: U' e S' nos instantes da grade avançados de dt. U constante por estágio
+ * (estágio k em [T_{k-1}, T_k)), S linear entre os fins de estágio; além do horizonte, o último valor. */
+static void desloca_variavel(mpc *c, real dt)
+{
+    int N = c->N;
+    real *U0 = c->Pn, *S0 = c->Pn + N;                 /* Pn (8×N) como rascunho: U (N) e S (4×N) cabem */
+    memcpy(U0, c->U, N * sizeof(real));
+    memcpy(S0, c->S, 4 * N * sizeof(real));
+    int j = 0;
+    for (int k = 0; k < N; k++) {                      /* U'_k = U(T_{k-1} + dt) */
+        real t = (k ? c->T[k - 1] : 0) + dt;
+        while (j < N - 1 && t >= c->T[j]) j++;
+        c->U[k] = U0[j];
+    }
+    j = 0;
+    for (int k = 0; k < N; k++) {                      /* S'_k = S(T_k + dt) */
+        real t = c->T[k] + dt;
+        while (j < N - 1 && t > c->T[j + 1]) j++;
+        if (j >= N - 1 || t >= c->T[N - 1]) {
+            memcpy(c->S + 4 * k, S0 + 4 * (N - 1), 4 * sizeof(real));
+            continue;
+        }
+        real a = (t - c->T[j]) / (c->T[j + 1] - c->T[j]);
+        for (int i = 0; i < 4; i++) c->S[4 * k + i] = (1 - a) * S0[4 * j + i] + a * S0[4 * (j + 1) + i];
     }
 }
 
@@ -125,6 +154,15 @@ mpc *mpc_cria(const mpc_config *cfg, const modelo *m, const double x0d[4], doubl
     c->B = (real *)calloc(4 * N, sizeof(real));
     c->ref = (real *)calloc(4 * N, sizeof(real));
 
+    real Ts = (real)m->Ts, T_tot = N * Ts;
+    if (cfg->horizonte > N * Ts * (1 + (real)1e-6) && N > 1) {   /* passo crescente: Σ h_k = horizonte */
+        real inc = 2 * (cfg->horizonte - N * Ts) / ((real)N * (N - 1));
+        c->h = (real *)calloc(N, sizeof(real));
+        c->T = (real *)calloc(N, sizeof(real));
+        real t = 0;
+        for (int k = 0; k < N; k++) c->h[k] = Ts + k * inc, t += c->h[k], c->T[k] = t;
+        T_tot = t;
+    }
     real Qe[16] = {0};
     for (int i = 0; i < 4; i++) Qe[i * 5] = cfg->Q[i];
     real vmax = cfg->dtheta_max;
@@ -145,11 +183,14 @@ mpc *mpc_cria(const mpc_config *cfg, const modelo *m, const double x0d[4], doubl
     c->ch = chronos_cria(4, 1, N, cfg->op, rs, Qe, &cfg->Rdu, cfg->terminal_dlqr ? c->Pterm : NULL, smin, smax, qv,
                          qv, &cfg->u_min, &cfg->u_max, &cfg->du_min, &cfg->du_max);
 
-    if (cfg->peso_exp != 0) {                     /* longe da referência no começo, perto no fim */
+    if (cfg->peso_exp != 0 || c->h) {             /* exponencial: longe da referência no começo, perto no fim */
         real *w = (real *)malloc(4 * N * sizeof(real));
-        for (int k = 0; k < N; k++)
+        for (int k = 0; k < N; k++) {
+            real fr = c->h ? c->T[k] / T_tot : (k + (real)1) / N;   /* fração do horizonte no fim do estágio */
+            real esc = c->h ? c->h[k] / Ts : 1;   /* passo variável: peso ∝ duração (custo = integral no tempo) */
             for (int i = 0; i < 4; i++)
-                w[4 * k + i] = cfg->peso_exp_estados[i] ? exp(cfg->peso_exp * ((k + (real)1) / N - 1)) : 1;
+                w[4 * k + i] = esc * (cfg->peso_exp_estados[i] && cfg->peso_exp != 0 ? exp(cfg->peso_exp * (fr - 1)) : 1);
+        }
         chronos_peso_estagio(c->ch, w);
         free(w);
     }
@@ -173,6 +214,7 @@ void mpc_libera(mpc *c)
     if (!c) return;
     chronos_libera(c->ch);
     free(c->U), free(c->S), free(c->P), free(c->Pn), free(c->A), free(c->B), free(c->ref);
+    free(c->h), free(c->T);
     free(c);
 }
 
@@ -180,10 +222,12 @@ double mpc_passo(mpc *c, const double xd[4], const double refd[4], mpc_info *inf
 {
     real x[4] = {xd[0], xd[1], xd[2], xd[3]}, ref[4] = {refd[0], refd[1], refd[2], refd[3]};
     int N = c->N;
-    if (!c->primeiro) {                                /* warm start: predição anterior deslocada */
+    if (!c->primeiro && !c->h) {                       /* warm start: predição anterior deslocada */
         memmove(c->S, c->S + 4, 4 * (N - 1) * sizeof(real));
         memmove(c->U, c->U + 1, (N - 1) * sizeof(real));
         c->U[N - 1] = c->U[N - 2];
+    } else if (!c->primeiro) {                         /* passo variável: a predição anterior Ts à frente no tempo */
+        desloca_variavel(c, (real)c->m.Ts);
     }
     if (c->primeiro)
         for (int j = 0; j < N; j++) modelo_rho(&c->m, x, c->P + 8 * j);

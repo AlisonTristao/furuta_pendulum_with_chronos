@@ -160,7 +160,9 @@ static void expm5(const real *M, real *E)
     for (int n = 0; n < s; n++) mat5_mul(E, E, E);
 }
 
-void modelo_zoh(const modelo *m, const real r[8], real A[16], real B[4])
+void modelo_zoh(const modelo *m, const real r[8], real A[16], real B[4]) { modelo_zoh_h(m, r, (real)m->Ts, A, B); }
+
+void modelo_zoh_h(const modelo *m, const real r[8], real h, real A[16], real B[4])
 {
     real Ts = (real)m->Ts, M[25] = {0}, E[25];
     M[0 * 5 + 2] = 1;
@@ -173,7 +175,7 @@ void modelo_zoh(const modelo *m, const real r[8], real A[16], real B[4])
     M[3 * 5 + 3] = r[5] / Ts;
     M[2 * 5 + 4] = r[6] / Ts;
     M[3 * 5 + 4] = r[7] / Ts;
-    for (int i = 0; i < 25; i++) M[i] *= Ts;
+    for (int i = 0; i < 25; i++) M[i] *= h;
     expm5(M, E);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) A[j * 4 + i] = E[i * 5 + j];   /* coluna */

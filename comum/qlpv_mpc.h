@@ -21,6 +21,8 @@ typedef struct {
     real qv_theta1, qv_dtheta, BIG;  /* pesos L1 das folgas; BIG = "sem limite" em θ2 */
     real peso_exp;                   /* α: peso do estágio k = exp(α((k+1)/N - 1)); 0 = uniforme */
     real peso_exp_estados[4];        /* 1 = o estado recebe o peso exponencial, 0 = peso constante */
+    real horizonte;                  /* > Np·Ts: passo do estágio k cresce em reta, h_k = Ts + k·inc, até somar
+                                        horizonte [s] (u constante em cada estágio = blocagem); 0 = uniforme */
     int rho_avg;                       /* 1: ρ médio no estágio (trapézio, eq. 13) */
     int terminal_dlqr;                 /* 1: custo terminal DLQR no topo */
     real Ru_lqr;
