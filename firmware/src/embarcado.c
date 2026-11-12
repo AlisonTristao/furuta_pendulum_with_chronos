@@ -132,6 +132,15 @@ static const char *roda_ensaio(int modo)
             criado = true;
             mpc_orcamento(s_ctl.c, relogio_us, ts_ms * 1000LL - FOLGA_US);   /* sem estouro: corta o laço dos rho */
             protocolo_envia("M,LIGADO,%d", (int)ulTaskNotifyTake(pdTRUE, 0));   // amostras perdidas na criação
+            {   // o que o ESP32 está usando de fato (confere a configuração mandada com P...)
+                const mpc_config *m = &cfg.mpc;
+                protocolo_envia("M,CFG,Np=%d,horizonte=%.3f,Q=%g/%g/%g/%g,Rdu=%g,u=%.3f/%.3f,peso_exp=%.2f,l_max=%d,"
+                                "theta1=%.3f,l2=%.4f,I2=%.4e,mu2=%.4e,comp=%.0f,Ts=%.3f",
+                                m->Np, (double)m->horizonte, (double)m->Q[0], (double)m->Q[1], (double)m->Q[2],
+                                (double)m->Q[3], (double)m->Rdu, (double)m->u_min, (double)m->u_max,
+                                (double)m->peso_exp, m->l_max, (double)m->theta1_max, cfg.f.l2, cfg.f.I2, cfg.f.mu2,
+                                e->comp_atraso_ms, e->Ts);
+            }
             continue;                             // a amostra já ficou velha: começa na próxima
         }
         int64_t t0 = esp_timer_get_time();

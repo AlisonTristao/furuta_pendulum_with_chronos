@@ -128,6 +128,8 @@ static int roda_embarcado(furuta *f, const config *cfg, int modo, const char *ar
             }
         } else if (!strncmp(r, "M,LIGADO", 8)) {
             printf("controle ligado (no ESP32)\n");
+        } else if (!strncmp(r, "M,CFG,", 6)) {
+            printf("ESP32 usando: %s\n", r + 6);
         } else if (!strncmp(r, "M,FIM", 5)) {
             snprintf(fim, sizeof(fim), "%s", r + 6);
             motivo = fim;
