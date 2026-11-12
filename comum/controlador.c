@@ -34,6 +34,12 @@ double controlador_passo(controlador *k, double x[4], double t, mpc_info *in)
     double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
     double u = mpc_passo(k->c, xc, ref, in);
     double a = in->finito ? modelo_acel_braco(&k->m, xc, u) : 0.0;
+    /* impulso inicial: tira o pêndulo do repouso (parado embaixo o MPC demora a "pegar"). +a na 1ª metade, -a na
+     * 2ª: o braço começa e termina parado. O MPC segue calculando (warm start) e o estimador usa o aplicado. */
+    if (e->impulso_ms > 0 && t < e->impulso_ms * 1e-3 - 1e-9) {
+        a = t < e->impulso_ms * 0.5e-3 - 1e-9 ? e->impulso_a : -e->impulso_a;
+        u = 0;
+    }
     k->u = u;
     k->a_int = k->a_ap;
     k->a_ap = a;

@@ -93,6 +93,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
     INT("ensaio", "estimador", c->e.estimador) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
     NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) INT("ensaio", "embarcado", c->e.embarcado)
+    NUM("ensaio", "impulso_a", c->e.impulso_a) NUM("ensaio", "impulso_ms", c->e.impulso_ms)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;
         c->e.equilibrio = !strcmp(v, "equilibrio");
