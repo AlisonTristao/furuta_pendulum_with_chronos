@@ -50,7 +50,8 @@ CHRONOS_API void chronos_libera(chronos *c);
 
 /* update_mpc_dynamics: A (nx×nx×N), B (nx×nu×N), página k = estágio k. */
 CHRONOS_API void chronos_dinamica(chronos *c, const double *A, const double *B);
-/* Peso do rastreamento por estágio (N valores, o último é o estágio terminal; padrão 1). */
+/* Peso do rastreamento por estágio e estado (nx×N, coluna k = estágio k, a última é o terminal; padrão 1).
+ * O elemento (i, j) de Qe no estágio k é multiplicado por sqrt(w_ik w_jk). */
 CHRONOS_API void chronos_peso_estagio(chronos *c, const double *w);
 /* update_mpc_ter_ingredients: troca P (nx×nx); P = 0 desliga o custo terminal. */
 CHRONOS_API void chronos_terminal(chronos *c, const double *P);

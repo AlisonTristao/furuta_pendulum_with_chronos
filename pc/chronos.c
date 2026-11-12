@@ -3,6 +3,7 @@
  * de operações. Índices 0-based: o estágio interior i (0..N-2) é o k = i+1 do MATLAB; a página i+1 de
  * A, B, Q_hat corresponde à página k+1 do MATLAB. */
 #include "chronos.h"
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,7 +26,7 @@ struct chronos {
 
     /* dados */
     double *A, *B, *Qe, *Rdu, *P2;
-    double *wq;                 /* peso do rastreamento por estágio (N; o último = terminal) */
+    double *wq;                 /* peso do rastreamento por estágio e estado (nx×N; coluna N-1 = terminal) */
     double *s_min, *s_max, *u_min, *u_max, *du_min, *du_max;
     double *grad_qv_k, *grad_qv_ter;
     double *r, *r_ter, *xN_ref, *beq_0;
@@ -53,6 +54,7 @@ struct chronos {
     double *delta_u, *delta_se, *delta_g_0, *delta_g_k, *delta_g_ter, *delta_v_k, *delta_v_ter;
 };
 
+#define WQ(c, i, j, k) sqrt((c)->wq[(size_t)(k) * (c)->nx + (i)] * (c)->wq[(size_t)(k) * (c)->nx + (j)])
 static double *zeros(size_t n) { return (double *)calloc(n > 0 ? n : 1, sizeof(double)); }
 static double *copia(const double *x, size_t n) { double *y = zeros(n); if (x) memcpy(y, x, n * sizeof(double)); return y; }
 static double dmax(double a, double b) { return a > b ? a : b; }
@@ -97,9 +99,9 @@ static void update_mpc_f0_hess(chronos *c)
     /* rastreamento: Q_E = C'Qe C = Qe */
     for (int k = 0; k < N - 1; k++)
         for (int j = 0; j < nx; j++)
-            for (int i = 0; i < nx; i++) c->Q_f0_k[k * pq + i + j * nse] += c->wq[k] * M(c->Qe, i, j, nx);
+            for (int i = 0; i < nx; i++) c->Q_f0_k[k * pq + i + j * nse] += WQ(c, i, j, k) * M(c->Qe, i, j, nx);
     for (int j = 0; j < nx; j++)
-        for (int i = 0; i < nx; i++) M(c->Q_f0_ter, i, j, nse) += c->wq[N - 1] * M(c->Qe, i, j, nx);
+        for (int i = 0; i < nx; i++) M(c->Q_f0_ter, i, j, nse) += WQ(c, i, j, N - 1) * M(c->Qe, i, j, nx);
     /* Δu */
     for (int j = 0; j < nu; j++)
         for (int i = 0; i < nu; i++) M(c->R_f0_0, i, j, nu) += M(c->Rdu, i, j, nu);
@@ -143,13 +145,13 @@ static void grad_f0_MPC(chronos *c)
     for (int k = 0; k < N - 1; k++)
         for (int i = 0; i < nx; i++) {
             double ge = 0.0;
-            for (int j = 0; j < nx; j++) ge += M(c->Qe, i, j, nx) * M(c->err, j, k, nx);
-            M(c->grad_se_f0_k, i, k, nse) -= c->wq[k] * ge;
+            for (int j = 0; j < nx; j++) ge += WQ(c, i, j, k) * M(c->Qe, i, j, nx) * M(c->err, j, k, nx);
+            M(c->grad_se_f0_k, i, k, nse) -= ge;
         }
     for (int i = 0; i < nx; i++) {
         double ge = 0.0;
-        for (int j = 0; j < nx; j++) ge += M(c->Qe, i, j, nx) * c->err_ter[j];
-        c->grad_se_f0_ter[i] -= c->wq[N - 1] * ge;
+        for (int j = 0; j < nx; j++) ge += WQ(c, i, j, N - 1) * M(c->Qe, i, j, nx) * c->err_ter[j];
+        c->grad_se_f0_ter[i] -= ge;
     }
     /* grad_f0_terminal_wrapper.m */
     if (c->ter)
@@ -814,8 +816,8 @@ chronos *chronos_cria(int nx, int nu, int N, chronos_opcoes op, chronos_restrico
     /* dados */
     c->A = zeros((size_t)nx * nx * N); c->B = zeros((size_t)nx * nu * N);
     c->Qe = copia(Qe, (size_t)nx * nx); c->Rdu = copia(Rdu, (size_t)nu * nu);
-    c->wq = zeros(N);
-    for (int k = 0; k < N; k++) c->wq[k] = 1.0;
+    c->wq = zeros((size_t)nx * N);
+    for (int k = 0; k < nx * N; k++) c->wq[k] = 1.0;
     c->P2 = zeros((size_t)nx * nx);
     c->ter = P != NULL;
     if (P) for (int i = 0; i < nx * nx; i++) c->P2[i] = 2.0 * P[i];
@@ -881,7 +883,7 @@ void chronos_dinamica(chronos *c, const double *A, const double *B)
 
 void chronos_peso_estagio(chronos *c, const double *w)
 {
-    memcpy(c->wq, w, (size_t)c->N * sizeof(double));
+    memcpy(c->wq, w, (size_t)c->nx * c->N * sizeof(double));
     c->recompute_cost_hess = 1;
 }
 

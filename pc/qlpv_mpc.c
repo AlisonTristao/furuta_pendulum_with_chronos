@@ -22,6 +22,7 @@ mpc_config mpc_config_artigo(void)
     c.Np = 40;
     c.Q[0] = 10, c.Q[1] = 100, c.Q[2] = 5, c.Q[3] = 1;
     c.Rdu = 100;
+    for (int i = 0; i < 4; i++) c.peso_exp_estados[i] = 1;
     c.u_min = -0.6, c.u_max = 0.6;
     c.du_min = -10, c.du_max = 10;
     c.theta1_min = -3.1416, c.theta1_max = 3.1416;
@@ -140,8 +141,10 @@ mpc *mpc_cria(const mpc_config *cfg, const modelo *m, const double x0[4], double
                          qv, &cfg->u_min, &cfg->u_max, &cfg->du_min, &cfg->du_max);
 
     if (cfg->peso_exp != 0) {                     /* longe da referência no começo, perto no fim */
-        double *w = (double *)malloc(N * sizeof(double));
-        for (int k = 0; k < N; k++) w[k] = exp(cfg->peso_exp * ((k + 1.0) / N - 1.0));
+        double *w = (double *)malloc(4 * N * sizeof(double));
+        for (int k = 0; k < N; k++)
+            for (int i = 0; i < 4; i++)
+                w[4 * k + i] = cfg->peso_exp_estados[i] ? exp(cfg->peso_exp * ((k + 1.0) / N - 1.0)) : 1.0;
         chronos_peso_estagio(c->ch, w);
         free(w);
     }

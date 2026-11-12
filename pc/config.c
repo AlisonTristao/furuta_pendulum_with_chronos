@@ -81,6 +81,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("mpc", "eps", c->mpc.op.eps) NUM("mpc", "peso_exp", c->mpc.peso_exp)
     NUM("mpc", "u_max_equilibrio", c->u_max_eq) NUM("mpc", "Rdu_equilibrio", c->Rdu_eq)
     if (!strcmp(sec, "mpc") && !strcmp(k, "Q")) return lista(v, c->mpc.Q, 4) == 4 ? 0 : -1;
+    if (!strcmp(sec, "mpc") && !strcmp(k, "peso_exp_estados")) return lista(v, c->mpc.peso_exp_estados, 4) == 4 ? 0 : -1;
 
     NUM("ensaio", "Ts", c->e.Ts) NUM("ensaio", "duracao", c->e.duracao)
     NUM("ensaio", "theta1_ref", c->e.theta1_ref) NUM("ensaio", "t_degrau", c->e.t_degrau)

@@ -62,6 +62,7 @@ def metricas(D):
         rms_t2=np.degrees(np.sqrt((w[m] ** 2).mean())) if m.any() else np.nan,
         rms_a=np.sqrt((D["a"][m] ** 2).mean()) if m.any() else np.nan,
         max_t1=np.abs(D["theta1"]).max(),
+        osc_t1=D["theta1"][m].std() if m.any() else np.nan,   # oscilação do braço no equilíbrio
         dur=t[-1],
     )
 
