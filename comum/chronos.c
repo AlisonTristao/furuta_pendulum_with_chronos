@@ -73,8 +73,8 @@ struct chronos {
 
 #define WQ(c, i, j, k) sqrt((c)->wq[(size_t)(k) * (c)->nx + (i)] * (c)->wq[(size_t)(k) * (c)->nx + (j)])
 #ifdef CHRONOS_PERFIL
-long long (*chronos_relogio)(void);
-long long chronos_perfil[12];
+unsigned (*chronos_relogio)(void);
+long long chronos_perfil[CHRONOS_NPERFIL];
 #endif
 
 static real *zeros(size_t n) { return (real *)calloc(n > 0 ? n : 1, sizeof(real)); }

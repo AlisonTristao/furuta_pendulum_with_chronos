@@ -41,12 +41,27 @@ typedef struct {
 CHRONOS_API chronos_opcoes chronos_opcoes_padrao(void);
 
 #ifdef CHRONOS_PERFIL
-/* Perfil de tempo (benchmark do firmware): chronos_relogio devolve µs; chronos_perfil acumula por etapa:
- * 0 grad, 1 resíduos de igualdade, 2 de desigualdade, 3 elementos do KKT, 4 Riccati, 5 folgas, 6 lambda2,
- * 7 busca de linha, 8 get_variables, 9 dinâmica (ZOH, qlpv_mpc), 10 rollout + folgas iniciais, 11 trajetória ρ */
-extern long long (*chronos_relogio)(void);
-extern long long chronos_perfil[12];
-#define CHRONOS_T(i, expr) do { long long t_ = chronos_relogio(); expr; chronos_perfil[i] += chronos_relogio() - t_; } while (0)
+/* Perfil de tempo (furuta -bench no firmware): chronos_relogio devolve um contador crescente (ciclos da CPU no
+ * ESP32; NULL = desligado, só um teste por etapa) e chronos_perfil acumula a diferença por etapa:
+ *   QP (CHRONOS): 0 grad, 1 resíduos de igualdade, 2 de desigualdade, 3 elementos do KKT, 4 Riccati, 5 folgas,
+ *                 6 lambda2, 7 busca de linha, 8 get_variables
+ *   qlpv_mpc:     9 predição (A, B por estágio: ZOH/RK4/Euler), 10 rollout + folgas iniciais, 11 atualização dos ρ,
+ *                 12 warm start (desloca a predição anterior + ρ inicial)
+ *   controlador:  13 estimador de dθ2, 14 compensação do atraso */
+#define CHRONOS_NPERFIL 16
+extern unsigned (*chronos_relogio)(void);
+extern long long chronos_perfil[CHRONOS_NPERFIL];
+#define CHRONOS_T(i, expr)                                                    \
+    do {                                                                      \
+        unsigned (*r_)(void) = chronos_relogio;                               \
+        if (r_) {                                                             \
+            unsigned t_ = r_();                                               \
+            expr;                                                             \
+            chronos_perfil[i] += (unsigned)(r_() - t_);                       \
+        } else {                                                              \
+            expr;                                                             \
+        }                                                                     \
+    } while (0)
 #else
 #define CHRONOS_T(i, expr) expr
 #endif

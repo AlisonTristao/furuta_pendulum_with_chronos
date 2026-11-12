@@ -14,4 +14,4 @@ file(WRITE ${CMAKE_CURRENT_LIST_DIR}/furuta_ini.c
 idf_component_register(SRCS bench.c controle.c embarcado.c encoder.c furuta_ini.c homing.c ident.c pinos.c saida.c stepper.c
                        INCLUDE_DIRS "."
                        REQUIRES mpc esp_driver_gpio
-                       PRIV_REQUIRES esp_driver_gptimer esp_driver_i2c esp_timer esp_rom)
+                       PRIV_REQUIRES esp_driver_gptimer esp_driver_i2c esp_timer esp_rom esp_hw_support)

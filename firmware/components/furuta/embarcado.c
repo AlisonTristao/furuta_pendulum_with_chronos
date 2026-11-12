@@ -44,11 +44,11 @@ static int resumo(const config *c, char *buf, int n)
     const mpc_config *m = &c->mpc;
     const ensaio *e = &c->e;
     return snprintf(buf, n,
-                    "mpc: Np=%d horizonte=%.3f Q=%g,%g,%g,%g Rdu=%g u=[%.3f,%.3f] peso_exp=%.2f l_max=%d "
-                    "theta1=[%.3f,%.3f]\n"
+                    "mpc: Np=%d horizonte=%.3f discretizacao=%s Q=%g,%g,%g,%g Rdu=%g u=[%.3f,%.3f] peso_exp=%.2f "
+                    "l_max=%d theta1=[%.3f,%.3f]\n"
                     "fisico: L1=%.4f l2=%.4f m2=%.5f I2=%.4e mu2=%.4e\n"
                     "ensaio: Ts=%.3f duracao=%.1f modo=%s comp_atraso_ms=%.0f impulso=%.0f/%.0f estimador=%d",
-                    m->Np, (double)m->horizonte, (double)m->Q[0], (double)m->Q[1], (double)m->Q[2], (double)m->Q[3],
+                    m->Np, (double)m->horizonte, modelo_disc_nome(m->discretizacao), (double)m->Q[0], (double)m->Q[1], (double)m->Q[2], (double)m->Q[3],
                     (double)m->Rdu, (double)m->u_min, (double)m->u_max, (double)m->peso_exp, m->l_max,
                     (double)m->theta1_min, (double)m->theta1_max, c->f.L1, c->f.l2, c->f.m2, c->f.I2, c->f.mu2, e->Ts,
                     e->duracao, e->equilibrio ? "equilibrio" : "swingup", e->comp_atraso_ms, e->impulso_a,
@@ -106,10 +106,6 @@ static const char *roda_ensaio(int modo)
         cfg.mpc.theta1_max = controle_limite() - e->margem_theta1;
         cfg.mpc.theta1_min = -cfg.mpc.theta1_max;
     }
-#ifdef CHRONOS_PERFIL
-    chronos_relogio = relogio_us;
-    memset(chronos_perfil, 0, sizeof(chronos_perfil));
-#endif
     int ts_ms = (int)lround(e->Ts * 1e3);
     controle_assina_amostra(s_tarefa_mpc, ts_ms);
     ulTaskNotifyTake(pdTRUE, 0);
@@ -202,14 +198,6 @@ static const char *roda_ensaio(int modo)
     controle_assina_amostra(NULL, 0);
     if (criado) controlador_libera(&s_ctl);
     // sem comando novo: o watchdog da malha (200 ms) freia o braço até parar
-#ifdef CHRONOS_PERFIL                             // MPC_PERFIL=1: tempo por etapa (µs por período)
-    int d = k ? k : 1;
-    saida_aviso("perfil (µs/período): grad %lld, res_ig %lld, res_des %lld, KKT %lld, Riccati %lld, folgas %lld, "
-                "lambda2 %lld, busca %lld, get_var %lld, ZOH %lld, rollout %lld, rho %lld",
-                chronos_perfil[0] / d, chronos_perfil[1] / d, chronos_perfil[2] / d, chronos_perfil[3] / d,
-                chronos_perfil[4] / d, chronos_perfil[5] / d, chronos_perfil[6] / d, chronos_perfil[7] / d,
-                chronos_perfil[8] / d, chronos_perfil[9] / d, chronos_perfil[10] / d, chronos_perfil[11] / d);
-#endif
     saida_aviso("fim do ensaio: %s (%.1f s, %u estouros)", motivo, k * e->Ts, estouros);
     return motivo;
 }

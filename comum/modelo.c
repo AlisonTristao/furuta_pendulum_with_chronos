@@ -4,7 +4,7 @@
 
 modelo modelo_de_fisico(fisico f, double Ts, double vmax)
 {
-    modelo m;
+    modelo m = {0};
     m.alpha = f.I1 + f.m2 * f.L1 * f.L1;
     m.beta = f.m2 * f.l2 * f.l2;
     m.gamma = f.m2 * f.L1 * f.l2;
@@ -210,6 +210,11 @@ static void expm5(const real *M, real *E)
     for (int n = 0; n < s; n++) mat5_mul(E, E, E);
 }
 
+const char *modelo_disc_nome(int disc)
+{
+    return disc == MODELO_EULER ? "euler" : disc == MODELO_RK4 ? "rk4" : "zoh";
+}
+
 void modelo_zoh(const modelo *m, const real r[8], real A[16], real B[4]) { modelo_zoh_h(m, r, (real)m->Ts, A, B); }
 
 void modelo_zoh_h(const modelo *m, const real r[8], real h, real A[16], real B[4])
@@ -226,7 +231,20 @@ void modelo_zoh_h(const modelo *m, const real r[8], real h, real A[16], real B[4
     M[2 * 5 + 4] = r[6] / Ts;
     M[3 * 5 + 4] = r[7] / Ts;
     for (int i = 0; i < 25; i++) M[i] *= h;
-    expm5(M, E);
+    if (m->disc == MODELO_EULER) {                 /* E = I + M */
+        for (int i = 0; i < 25; i++) E[i] = M[i] + (i % 6 == 0);
+    } else if (m->disc == MODELO_RK4) {            /* E = I + M (I + M/2 (I + M/3 (I + M/4))) (Horner) */
+        real T[25];
+        for (int i = 0; i < 25; i++) T[i] = M[i] * (real)0.25 + (i % 6 == 0);
+        for (int d = 3; d >= 1; d--) {
+            mat5_mul(M, T, T);
+            real id = (real)1 / d;
+            for (int i = 0; i < 25; i++) T[i] = T[i] * id + (i % 6 == 0);
+        }
+        memcpy(E, T, sizeof(T));
+    } else {
+        expm5(M, E);
+    }
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) A[j * 4 + i] = E[i * 5 + j];   /* coluna */
         B[i] = E[i * 5 + 4];

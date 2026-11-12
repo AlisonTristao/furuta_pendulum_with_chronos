@@ -147,6 +147,8 @@ mpc *mpc_cria(const mpc_config *cfg, const modelo *m, const double x0d[4], doubl
     int N = cfg->Np;
     c->cfg = *cfg;
     c->m = *m;
+    c->m.disc = cfg->discretizacao;
+    m = &c->m;                                    /* daqui em diante, com a discretização da configuração */
     c->N = N;
     c->U = (real *)calloc(N, sizeof(real));
     c->S = (real *)calloc(4 * N, sizeof(real));
@@ -228,17 +230,19 @@ double mpc_passo(mpc *c, const double xd[4], const double refd[4], mpc_info *inf
 {
     real x[4] = {xd[0], xd[1], xd[2], xd[3]}, ref[4] = {refd[0], refd[1], refd[2], refd[3]};
     int N = c->N;
-    if (!c->primeiro && !c->h) {                       /* warm start: predição anterior deslocada */
-        memmove(c->S, c->S + 4, 4 * (N - 1) * sizeof(real));
-        memmove(c->U, c->U + 1, (N - 1) * sizeof(real));
-        c->U[N - 1] = c->U[N - 2];
-    } else if (!c->primeiro) {                         /* passo variável: a predição anterior Ts à frente no tempo */
-        desloca_variavel(c, (real)c->m.Ts);
-    }
-    if (c->primeiro)
-        for (int j = 0; j < N; j++) modelo_rho(&c->m, x, c->P + 8 * j);
-    else
-        rho_trajetoria(c, x, c->S, c->P);
+    CHRONOS_T(12, {
+        if (!c->primeiro && !c->h) {                   /* warm start: predição anterior deslocada */
+            memmove(c->S, c->S + 4, 4 * (N - 1) * sizeof(real));
+            memmove(c->U, c->U + 1, (N - 1) * sizeof(real));
+            c->U[N - 1] = c->U[N - 2];
+        } else if (!c->primeiro) {                     /* passo variável: a predição anterior Ts à frente no tempo */
+            desloca_variavel(c, (real)c->m.Ts);
+        }
+        if (c->primeiro)
+            for (int j = 0; j < N; j++) modelo_rho(&c->m, x, c->P + 8 * j);
+        else
+            rho_trajetoria(c, x, c->S, c->P);
+    });
     for (int k = 0; k < N; k++) memcpy(c->ref + 4 * k, ref, 4 * sizeof(real));
 
     mpc_info in = {0, 0, INFINITY, 0, 1, 0};

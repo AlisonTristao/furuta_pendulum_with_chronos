@@ -81,6 +81,13 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("mpc", "l_max", c->mpc.l_max) NUM("mpc", "eps_rho", c->mpc.eps_rho)
     INT("mpc", "max_iter", c->mpc.op.max_iter) NUM("mpc", "t_barreira", c->mpc.op.t)
     NUM("mpc", "eps", c->mpc.op.eps) NUM("mpc", "peso_exp", c->mpc.peso_exp) NUM("mpc", "horizonte", c->mpc.horizonte)
+    if (!strcmp(sec, "mpc") && !strcmp(k, "discretizacao")) {   /* zoh | rk4 | euler */
+        if (!strcmp(v, "zoh")) c->mpc.discretizacao = MODELO_ZOH;
+        else if (!strcmp(v, "rk4")) c->mpc.discretizacao = MODELO_RK4;
+        else if (!strcmp(v, "euler")) c->mpc.discretizacao = MODELO_EULER;
+        else return -1;
+        return 0;
+    }
     if (!strcmp(sec, "mpc") && (!strcmp(k, "Q") || !strcmp(k, "peso_exp_estados"))) {
         double t[4];
         if (lista(v, t, 4) != 4) return -1;
@@ -261,6 +268,7 @@ void config_imprime(const config *c)
         printf("passo variável: horizonte %g s em %d estágios, h = %g ms + k·%.3g ms (último %.1f ms)\n", D(m->horizonte),
                m->Np, c->e.Ts * 1e3, inc * 1e3, (c->e.Ts + (m->Np - 1) * inc) * 1e3);
     }
+    printf("     discretizacao=%s\n", modelo_disc_nome(m->discretizacao));
     printf("     peso_exp=%g (estados %g,%g,%g,%g) rho_avg=%d terminal_dlqr=%d l_max=%d eps_rho=%g max_iter=%d t=%g\n",
            D(m->peso_exp), D(m->peso_exp_estados[0]), D(m->peso_exp_estados[1]), D(m->peso_exp_estados[2]),
            D(m->peso_exp_estados[3]), m->rho_avg, m->terminal_dlqr, m->l_max, D(m->eps_rho), m->op.max_iter, D(m->op.t));

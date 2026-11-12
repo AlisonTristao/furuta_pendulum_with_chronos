@@ -14,7 +14,15 @@ typedef struct {
 typedef struct {
     double alpha, beta, gamma, delta, eta, mu1, mu2, Ts, vmax;
     double tc2;   /* atrito seco no pêndulo [N·m] (só na planta simulada; o MPC usa 0) */
+    int disc;     /* discretização de modelo_zoh/_h: MODELO_ZOH (0), MODELO_RK4, MODELO_EULER */
 } modelo;
+
+/* Discretização do qLPV por estágio, x+ = A x + B u com u constante no estágio (M = h·[Ac Bc; 0 0]):
+ * ZOH = expm(M) (exata para o modelo congelado); RK4 = Taylor de ordem 4 de expm(M), que é o passo de RK4 de um
+ * sistema linear (3 produtos 5×5 contra ~7 + escalonamentos); Euler = I + M (sem produto, instável para passos
+ * grandes nos modos oscilantes). */
+enum { MODELO_ZOH = 0, MODELO_EULER = 1, MODELO_RK4 = 4 };
+const char *modelo_disc_nome(int disc);
 
 modelo modelo_de_fisico(fisico f, double Ts, double vmax);
 

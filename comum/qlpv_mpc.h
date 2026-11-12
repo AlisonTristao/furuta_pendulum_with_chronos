@@ -23,6 +23,7 @@ typedef struct {
     real peso_exp_estados[4];        /* 1 = o estado recebe o peso exponencial, 0 = peso constante */
     real horizonte;                  /* > Np·Ts: passo do estágio k cresce em reta, h_k = Ts + k·inc, até somar
                                         horizonte [s] (u constante em cada estágio = blocagem); 0 = uniforme */
+    int discretizacao;                 /* predição A, B por estágio: MODELO_ZOH (expm, padrão), MODELO_RK4, MODELO_EULER */
     int rho_avg;                       /* 1: ρ médio no estágio (trapézio, eq. 13) */
     int terminal_dlqr;                 /* 1: custo terminal DLQR no topo */
     real Ru_lqr;
