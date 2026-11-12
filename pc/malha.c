@@ -196,6 +196,7 @@ int main(int argc, char **argv)
     const char *motivo = "fim da duração";
     estimador est;
     estimador_cria(&est, e->est_L1, e->est_L2);
+    estimador_topo(&est, e->est_L1_topo, e->est_L2_topo, e->est_janela);
     double a_cmd = 0;                                  /* último comando enviado (em espera foi 0) */
     double t0 = periodo_agora();
     for (k = 0; k < K && !g_parar; k++) {

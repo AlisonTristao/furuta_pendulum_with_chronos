@@ -33,6 +33,7 @@ typedef struct {
     double wrap_hist;                             /* histerese do dobramento [rad]: troca de volta só em |θ2| > π + hist */
     int estimador;                                /* 1: dθ2 pelo estimador com modelo no PC (estimador.h) */
     double est_L1, est_L2;
+    double est_L1_topo, est_L2_topo, est_janela;  /* ganhos do estimador perto do topo (est_janela = 0: os mesmos) */
     double troca_equilibrio;                      /* |θ2| (rad) em que passa ao controle de equilíbrio (volta em 2×) */
     double janela_equilibrio;                     /* |θ2| (rad) em que o modo equilíbrio assume */
 } ensaio;

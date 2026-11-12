@@ -55,6 +55,7 @@ int main(int argc, char **argv)
     }
     estimador est;
     estimador_cria(&est, e->est_L1, e->est_L2);
+    estimador_topo(&est, e->est_L1_topo, e->est_L2_topo, e->est_janela);
     double a_cmd = 0;                             /* último comando enviado */
     double xm[4] = {x[0], x[1], x[2], x[3]};      /* o que o controle vê */
     double th_est = x[1], w_est = x[3], fila[256] = {0};   /* fila: comando por ms (atraso) */

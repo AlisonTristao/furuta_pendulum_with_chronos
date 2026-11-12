@@ -89,6 +89,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
     INT("ensaio", "estimador", c->e.estimador) INT("ensaio", "wrap_theta2", c->e.wrap_theta2) NUM("ensaio", "wrap_hist", c->e.wrap_hist) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
+    NUM("ensaio", "est_L1_topo", c->e.est_L1_topo) NUM("ensaio", "est_L2_topo", c->e.est_L2_topo) NUM("ensaio", "est_janela", c->e.est_janela)
     NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) NUM("ensaio", "troca_equilibrio", c->e.troca_equilibrio)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;
