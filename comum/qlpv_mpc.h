@@ -11,20 +11,21 @@
 #include "chronos.h"
 #include "modelo.h"
 
+/* Configuração e predição no tipo do controlador (real.h: double no PC, float no ESP32); estado e u em double. */
 typedef struct {
     int Np;
-    double Q[4], Rdu;
-    double u_min, u_max, du_min, du_max;
-    double theta1_min, theta1_max;     /* restrição suave de θ1 */
-    double dtheta_max;                 /* restrição suave de |dθ1|, |dθ2| */
-    double qv_theta1, qv_dtheta, BIG;  /* pesos L1 das folgas; BIG = "sem limite" em θ2 */
-    double peso_exp;                   /* α: peso do estágio k = exp(α((k+1)/N - 1)); 0 = uniforme */
-    double peso_exp_estados[4];        /* 1 = o estado recebe o peso exponencial, 0 = peso constante */
+    real Q[4], Rdu;
+    real u_min, u_max, du_min, du_max;
+    real theta1_min, theta1_max;     /* restrição suave de θ1 */
+    real dtheta_max;                 /* restrição suave de |dθ1|, |dθ2| */
+    real qv_theta1, qv_dtheta, BIG;  /* pesos L1 das folgas; BIG = "sem limite" em θ2 */
+    real peso_exp;                   /* α: peso do estágio k = exp(α((k+1)/N - 1)); 0 = uniforme */
+    real peso_exp_estados[4];        /* 1 = o estado recebe o peso exponencial, 0 = peso constante */
     int rho_avg;                       /* 1: ρ médio no estágio (trapézio, eq. 13) */
     int terminal_dlqr;                 /* 1: custo terminal DLQR no topo */
-    double Ru_lqr;
+    real Ru_lqr;
     int l_max;
-    double eps_rho;
+    real eps_rho;
     chronos_opcoes op;
 } mpc_config;
 
@@ -33,7 +34,7 @@ mpc_config mpc_config_artigo(void);
 
 typedef struct {
     int n_qp, n_it;        /* QPs do laço dos ρ e iterações de Newton somadas */
-    double dP;             /* ‖T(P) - P‖∞ do último QP */
+    real dP;             /* ‖T(P) - P‖∞ do último QP */
     int convergiu, finito;
 } mpc_info;
 
@@ -46,9 +47,9 @@ void mpc_libera(mpc *c);
 double mpc_passo(mpc *c, const double x[4], const double ref[4], mpc_info *info);
 
 /* Predição do último passo: U (Np) e s (4×Np, coluna k = x(k+1|k)). */
-const double *mpc_U(const mpc *c);
-const double *mpc_S(const mpc *c);
+const real *mpc_U(const mpc *c);
+const real *mpc_S(const mpc *c);
 /* Matriz terminal usada (4×4, coluna; zeros sem terminal). */
-const double *mpc_P_terminal(const mpc *c);
+const real *mpc_P_terminal(const mpc *c);
 
 #endif

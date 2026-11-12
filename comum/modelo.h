@@ -3,6 +3,8 @@
 #ifndef MODELO_H
 #define MODELO_H
 
+#include "real.h"
+
 /* Parâmetros físicos (SI). */
 typedef struct {
     double m2, L1, l2, I1, I2, mu1, mu2, g;
@@ -25,9 +27,10 @@ void modelo_passo(const modelo *m, double x[4], double u, int nsub);
 /* Planta como no hardware: o motor impõe θ̈1 = a (constante) e o pêndulo responde. RK4 com nsub subpassos em h. */
 void modelo_passo_acel(const modelo *m, double x[4], double a, double h, int nsub);
 
-/* ρ = f_ρ(x) (8, eq. 12), na escala de Ts (ρ·Ts), com dθ saturadas em ±vmax. */
-void modelo_rho(const modelo *m, const double x[4], double r[8]);
+/* ρ e ZOH no tipo do controlador (real.h); o resto em double (planta simulada, estimador, compensação de atraso).
+ * ρ = f_ρ(x) (8, eq. 12), na escala de Ts (ρ·Ts), com dθ saturadas em ±vmax. */
+void modelo_rho(const modelo *m, const real x[4], real r[8]);
 /* (A, B) de um estágio por ZOH (eq. 13): A 4×4 (coluna), B 4. r na escala de Ts. */
-void modelo_zoh(const modelo *m, const double r[8], double A[16], double B[4]);
+void modelo_zoh(const modelo *m, const real r[8], real A[16], real B[4]);
 
 #endif

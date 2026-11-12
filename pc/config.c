@@ -78,8 +78,13 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("mpc", "l_max", c->mpc.l_max) NUM("mpc", "eps_rho", c->mpc.eps_rho)
     INT("mpc", "max_iter", c->mpc.op.max_iter) NUM("mpc", "t_barreira", c->mpc.op.t)
     NUM("mpc", "eps", c->mpc.op.eps) NUM("mpc", "peso_exp", c->mpc.peso_exp)
-    if (!strcmp(sec, "mpc") && !strcmp(k, "Q")) return lista(v, c->mpc.Q, 4) == 4 ? 0 : -1;
-    if (!strcmp(sec, "mpc") && !strcmp(k, "peso_exp_estados")) return lista(v, c->mpc.peso_exp_estados, 4) == 4 ? 0 : -1;
+    if (!strcmp(sec, "mpc") && (!strcmp(k, "Q") || !strcmp(k, "peso_exp_estados"))) {
+        double t[4];
+        if (lista(v, t, 4) != 4) return -1;
+        real *dst = !strcmp(k, "Q") ? c->mpc.Q : c->mpc.peso_exp_estados;   /* real: float no controlador do ESP32 */
+        for (int i = 0; i < 4; i++) dst[i] = (real)t[i];
+        return 0;
+    }
 
     NUM("ensaio", "Ts", c->e.Ts) NUM("ensaio", "duracao", c->e.duracao)
     NUM("ensaio", "theta1_ref", c->e.theta1_ref) NUM("ensaio", "t_degrau", c->e.t_degrau)

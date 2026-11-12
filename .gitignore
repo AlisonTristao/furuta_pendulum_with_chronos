@@ -18,3 +18,4 @@ host/ensaios/
 pc/*.exe
 pc/*.csv
 pc/ensaios/
+pc/obj_f/

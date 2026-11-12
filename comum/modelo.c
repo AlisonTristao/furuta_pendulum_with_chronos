@@ -1,6 +1,5 @@
 #include "modelo.h"
 
-#include <math.h>
 #include <string.h>
 
 modelo modelo_de_fisico(fisico f, double Ts, double vmax)
@@ -81,33 +80,36 @@ void modelo_passo_acel(const modelo *m, double x[4], double a, double h0, int ns
     }
 }
 
-static double sinc(double th)
+/* Daqui para baixo: ρ e ZOH, chamados a cada estágio de cada QP do MPC, no tipo do controlador (real.h). */
+static real sinc(real th)
 {
-    if (fabs(th) < 1e-4) {
-        double t2 = th * th;
+    if (fabs(th) < (real)1e-4) {
+        real t2 = th * th;
         return 1 - t2 / 6 + t2 * t2 / 120 - t2 * t2 * t2 / 5040;
     }
     return sin(th) / th;
 }
 
-static double sat(double v, double l) { return v > l ? l : (v < -l ? -l : v); }
+static real sat(real v, real l) { return v > l ? l : (v < -l ? -l : v); }
 
 /* Mesma ordem e mesmas expressões do código de referência (qlpv_nn_furuta/python/nmpc/modelo.py, sched):
  * r = Ts·(ρ1, ρ3', ρ4, ρ2, ρ5', ρ6, ρ7, ρ8) na disposição das linhas 3 e 4 de (Ac, Bc). */
-void modelo_rho(const modelo *m, const double x[4], double r[8])
+void modelo_rho(const modelo *m, const real x[4], real r[8])
 {
-    double th2 = x[1], dth1 = sat(x[2], m->vmax), dth2 = sat(x[3], m->vmax);
-    double s = sin(th2), c = cos(th2), s2 = sin(2 * th2), sc = sinc(th2);
-    double a = m->alpha + m->beta * s * s;
-    double Det = a * m->delta - m->gamma * m->gamma * c * c;
-    double be = m->beta, ga = m->gamma, de = m->delta, et = m->eta, mu1 = m->mu1, mu2 = m->mu2;
-    double N1 = -ga * et * c * sc;
-    double N2 = -de * be * s2 * dth2 - de * mu1 - ga * be * s * c * c * dth1;
-    double N3 = de * ga * s * dth2 + ga * c * mu2;
-    double N4 = a * et * sc;
-    double N5 = ga * be * c * s2 * dth2 + ga * c * mu1 + a * be * s * c * dth1;
-    double N6 = -ga * ga * c * s * dth2 - a * mu2;
-    double k = m->Ts / Det;
+    real vmax = (real)m->vmax;
+    real th2 = x[1], dth1 = sat(x[2], vmax), dth2 = sat(x[3], vmax);
+    real s = sin(th2), c = cos(th2), s2 = sin(2 * th2), sc = sinc(th2);
+    real al = (real)m->alpha, be = (real)m->beta, ga = (real)m->gamma, de = (real)m->delta, et = (real)m->eta;
+    real mu1 = (real)m->mu1, mu2 = (real)m->mu2;
+    real a = al + be * s * s;
+    real Det = a * de - ga * ga * c * c;
+    real N1 = -ga * et * c * sc;
+    real N2 = -de * be * s2 * dth2 - de * mu1 - ga * be * s * c * c * dth1;
+    real N3 = de * ga * s * dth2 + ga * c * mu2;
+    real N4 = a * et * sc;
+    real N5 = ga * be * c * s2 * dth2 + ga * c * mu1 + a * be * s * c * dth1;
+    real N6 = -ga * ga * c * s * dth2 - a * mu2;
+    real k = (real)m->Ts / Det;
     r[0] = k * N1;
     r[1] = k * N2;
     r[2] = k * N3;
@@ -119,33 +121,33 @@ void modelo_rho(const modelo *m, const double x[4], double r[8])
 }
 
 /* expm de matriz 5×5 (linha) por escalonamento e quadratura + Taylor de ordem 15 (igual ao código de referência). */
-static void mat5_mul(const double *X, const double *Y, double *Z)
+static void mat5_mul(const real *X, const real *Y, real *Z)
 {
-    double t[25];
+    real t[25];
     for (int i = 0; i < 5; i++)
         for (int j = 0; j < 5; j++) {
-            double acc = 0;
+            real acc = 0;
             for (int k = 0; k < 5; k++) acc += X[i * 5 + k] * Y[k * 5 + j];
             t[i * 5 + j] = acc;
         }
     memcpy(Z, t, sizeof(t));
 }
 
-static void expm5(const double *M, double *E)
+static void expm5(const real *M, real *E)
 {
-    double nrm = 0;
+    real nrm = 0;
     for (int j = 0; j < 5; j++) {
-        double c = 0;
+        real c = 0;
         for (int i = 0; i < 5; i++) c += fabs(M[i * 5 + j]);
         if (c > nrm) nrm = c;
     }
     int s = 0;
-    while (nrm > 0.125) {
+    while (nrm > (real)0.125) {
         nrm /= 2;
         s++;
     }
-    double A[25], T[25];
-    double esc = ldexp(1.0, -s);
+    real A[25], T[25];
+    real esc = ldexp((real)1, -s);
     for (int i = 0; i < 25; i++) A[i] = M[i] * esc;
     for (int i = 0; i < 25; i++) E[i] = T[i] = (i % 6 == 0);
     for (int k = 1; k < 16; k++) {
@@ -158,9 +160,9 @@ static void expm5(const double *M, double *E)
     for (int n = 0; n < s; n++) mat5_mul(E, E, E);
 }
 
-void modelo_zoh(const modelo *m, const double r[8], double A[16], double B[4])
+void modelo_zoh(const modelo *m, const real r[8], real A[16], real B[4])
 {
-    double Ts = m->Ts, M[25] = {0}, E[25];
+    real Ts = (real)m->Ts, M[25] = {0}, E[25];
     M[0 * 5 + 2] = 1;
     M[1 * 5 + 3] = 1;
     M[2 * 5 + 1] = r[0] / Ts;

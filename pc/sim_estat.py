@@ -3,6 +3,7 @@ como a tabela dos ensaios reais (mediana e faixa). A simulação é biestável, 
 
     python sim_estat.py [-n 8] [-d 30] "nome|secao.chave=valor ..." ["nome2|..." ...]
     ex.: python sim_estat.py "sem estimador|ensaio.estimador=0" "com estimador|"
+         python sim_estat.py "double|" "float|exe=sim_f.exe"   (controlador em float, como no ESP32)
 
 Métricas extras: erro dθ2 = dθ2 que o controle viu - diferença central de θ2 (no topo); rug = rugosidade de θ2
 (resíduo da 2ª diferença após ajustar a dinâmica do pêndulo, em LSB do AS5600). Nos ensaios reais:
@@ -30,7 +31,9 @@ def rugosidade(D):
 
 
 def roda(csv, extra, dur):
-    subprocess.run([os.path.join(AQUI, "sim.exe"), os.path.join(AQUI, "furuta.ini"), csv, f"ensaio.duracao={dur}"]
+    exe = next((x[4:] for x in extra if x.startswith("exe=")), "sim.exe")   # exe=sim_f.exe: controlador em float
+    extra = [x for x in extra if not x.startswith("exe=")]
+    subprocess.run([os.path.join(AQUI, exe), os.path.join(AQUI, "furuta.ini"), csv, f"ensaio.duracao={dur}"]
                    + extra, cwd=AQUI, capture_output=True)
     D = G.le(csv); M = G.metricas(D)
     if M is not None:

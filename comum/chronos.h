@@ -20,12 +20,14 @@
 #define CHRONOS_API
 #endif
 
+#include "real.h"
+
 typedef struct chronos chronos;
 
 /* Opções do solver (init_mpc.m): t = 50, Beta = 0,75, min_l = 1e-6, eps = 1e-4, max_iter = 10,
  * slack_epsilon = 1e-3, eps_thknv = 1e-6. */
 typedef struct {
-    double t, Beta, min_l, eps, slack_epsilon, eps_thknv;
+    real t, Beta, min_l, eps, slack_epsilon, eps_thknv;
     int max_iter;
 } chronos_opcoes;
 
@@ -41,41 +43,41 @@ CHRONOS_API chronos_opcoes chronos_opcoes_padrao(void);
 /* Cria o problema. Qe (nx×nx), Rdu (nu×nu), P (nx×nx, terminal; NULL = sem custo terminal).
  * Limites: vetores de tamanho nx (estado, qv) e nu (u, Δu); NULL nos desligados. */
 CHRONOS_API chronos *chronos_cria(int nx, int nu, int N, chronos_opcoes op, chronos_restricoes rs,
-                                  const double *Qe, const double *Rdu, const double *P,
-                                  const double *s_min, const double *s_max,
-                                  const double *qv_min, const double *qv_max,
-                                  const double *u_min, const double *u_max,
-                                  const double *du_min, const double *du_max);
+                                  const real *Qe, const real *Rdu, const real *P,
+                                  const real *s_min, const real *s_max,
+                                  const real *qv_min, const real *qv_max,
+                                  const real *u_min, const real *u_max,
+                                  const real *du_min, const real *du_max);
 CHRONOS_API void chronos_libera(chronos *c);
 
 /* update_mpc_dynamics: A (nx×nx×N), B (nx×nu×N), página k = estágio k. */
-CHRONOS_API void chronos_dinamica(chronos *c, const double *A, const double *B);
+CHRONOS_API void chronos_dinamica(chronos *c, const real *A, const real *B);
 /* Peso do rastreamento por estágio e estado (nx×N, coluna k = estágio k, a última é o terminal; padrão 1).
  * O elemento (i, j) de Qe no estágio k é multiplicado por sqrt(w_ik w_jk). */
-CHRONOS_API void chronos_peso_estagio(chronos *c, const double *w);
+CHRONOS_API void chronos_peso_estagio(chronos *c, const real *w);
 /* update_mpc_ter_ingredients: troca P (nx×nx); P = 0 desliga o custo terminal. */
-CHRONOS_API void chronos_terminal(chronos *c, const double *P);
+CHRONOS_API void chronos_terminal(chronos *c, const real *P);
 
 /* build_chronos_mpc: chute inicial (rollstates com u = u_prev saturado) e folgas iniciais. */
-CHRONOS_API void chronos_inicializa(chronos *c, const double *s_prev, const double *u_prev);
+CHRONOS_API void chronos_inicializa(chronos *c, const real *s_prev, const real *u_prev);
 /* initialize_inequality_slacks (reinit_slacks.m): folgas g, v coerentes com o u, su, s atuais. */
-CHRONOS_API void chronos_reinicia_folgas(chronos *c, const double *s_prev, const double *u_prev);
+CHRONOS_API void chronos_reinicia_folgas(chronos *c, const real *s_prev, const real *u_prev);
 
 /* mpc_solve: ref (nx×N), coluna k = referência do estágio k (a última também é a terminal).
  * Devolve o número de iterações; u0 (nu) recebe o primeiro controle. */
-CHRONOS_API int chronos_resolve(chronos *c, const double *s_prev, const double *u_prev,
-                                const double *ref, double *u0);
+CHRONOS_API int chronos_resolve(chronos *c, const real *s_prev, const real *u_prev,
+                                const real *ref, real *u0);
 
 /* Acesso ao iterado (ordem de coluna): s (nx×N), u (nu×N), su (nu×N), g_0 (ng0), g_k (ngk×(N-1)),
  * g_ter (nter), v_k (nvk×(N-1)), v_ter (nter). */
-CHRONOS_API double *chronos_s(chronos *c);
-CHRONOS_API double *chronos_u(chronos *c);
-CHRONOS_API double *chronos_su(chronos *c);
-CHRONOS_API double *chronos_g_0(chronos *c);
-CHRONOS_API double *chronos_g_k(chronos *c);
-CHRONOS_API double *chronos_g_ter(chronos *c);
-CHRONOS_API double *chronos_v_k(chronos *c);
-CHRONOS_API double *chronos_v_ter(chronos *c);
+CHRONOS_API real *chronos_s(chronos *c);
+CHRONOS_API real *chronos_u(chronos *c);
+CHRONOS_API real *chronos_su(chronos *c);
+CHRONOS_API real *chronos_g_0(chronos *c);
+CHRONOS_API real *chronos_g_k(chronos *c);
+CHRONOS_API real *chronos_g_ter(chronos *c);
+CHRONOS_API real *chronos_v_k(chronos *c);
+CHRONOS_API real *chronos_v_ter(chronos *c);
 /* Tamanhos: [ng0, ngk, nvk, nter]. */
 CHRONOS_API void chronos_tamanhos(const chronos *c, int *n);
 
