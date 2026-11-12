@@ -92,7 +92,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("ensaio", "usa_limite_homing", c->e.usa_limite_homing) NUM("ensaio", "dtheta2_aborta", c->e.theta2_aborta)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
     INT("ensaio", "estimador", c->e.estimador) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
-    NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms)
+    NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) INT("ensaio", "embarcado", c->e.embarcado)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;
         c->e.equilibrio = !strcmp(v, "equilibrio");
@@ -209,18 +209,56 @@ int config_le_args(int argc, char **argv, config *c, const char **livre)
 
 void config_imprime(const config *c)
 {
+#define D(x) ((double)(x))   /* real pode ser float (controlador do ESP32) */
     const fisico *f = &c->f;
     const mpc_config *m = &c->mpc;
     printf("fisico: m2=%g L1=%g l2=%g I1=%g I2=%g mu1=%g mu2=%g g=%g\n", f->m2, f->L1, f->l2, f->I1, f->I2, f->mu1,
            f->mu2, f->g);
     printf("mpc: Ts=%g Np=%d Q=(%g,%g,%g,%g) Rdu=%g u=[%g,%g] du=[%g,%g] theta1=[%g,%g] dtheta<=%g qv=(%g,%g)\n",
-           c->e.Ts, m->Np, m->Q[0], m->Q[1], m->Q[2], m->Q[3], m->Rdu, m->u_min, m->u_max, m->du_min, m->du_max,
-           m->theta1_min, m->theta1_max, m->dtheta_max, m->qv_theta1, m->qv_dtheta);
-    if (m->horizonte > m->Np * c->e.Ts) {
-        double inc = 2 * (m->horizonte - m->Np * c->e.Ts) / ((double)m->Np * (m->Np - 1));
-        printf("passo variável: horizonte %g s em %d estágios, h = %g ms + k·%.3g ms (último %.1f ms)\n", (double)m->horizonte,
+           c->e.Ts, m->Np, D(m->Q[0]), D(m->Q[1]), D(m->Q[2]), D(m->Q[3]), D(m->Rdu), D(m->u_min), D(m->u_max),
+           D(m->du_min), D(m->du_max), D(m->theta1_min), D(m->theta1_max), D(m->dtheta_max), D(m->qv_theta1),
+           D(m->qv_dtheta));
+    if (D(m->horizonte) > m->Np * c->e.Ts) {
+        double inc = 2 * (D(m->horizonte) - m->Np * c->e.Ts) / ((double)m->Np * (m->Np - 1));
+        printf("passo variável: horizonte %g s em %d estágios, h = %g ms + k·%.3g ms (último %.1f ms)\n", D(m->horizonte),
                m->Np, c->e.Ts * 1e3, inc * 1e3, (c->e.Ts + (m->Np - 1) * inc) * 1e3);
     }
-    printf("     rho_avg=%d terminal_dlqr=%d l_max=%d eps_rho=%g max_iter=%d t=%g\n", m->rho_avg, m->terminal_dlqr,
-           m->l_max, m->eps_rho, m->op.max_iter, m->op.t);
+    printf("     peso_exp=%g (estados %g,%g,%g,%g) rho_avg=%d terminal_dlqr=%d l_max=%d eps_rho=%g max_iter=%d t=%g\n",
+           D(m->peso_exp), D(m->peso_exp_estados[0]), D(m->peso_exp_estados[1]), D(m->peso_exp_estados[2]),
+           D(m->peso_exp_estados[3]), m->rho_avg, m->terminal_dlqr, m->l_max, D(m->eps_rho), m->op.max_iter, D(m->op.t));
+#undef D
+}
+
+int config_pares(const char *arquivo, int argc, char **argv, const char *secoes,
+                 int (*cb)(const char *par, void *ctx), void *ctx)
+{
+    FILE *fp = fopen(arquivo, "r");
+    if (!fp) return -1;
+    char linha[256], sec[32] = "", par[200];
+    int r = 0;
+    while (!r && fgets(linha, sizeof(linha), fp)) {
+        char *p = strpbrk(linha, ";#");
+        if (p) *p = '\0';
+        p = apara(linha);
+        if (!*p) continue;
+        if (*p == '[') {
+            char *f = strchr(p, ']');
+            if (f) *f = '\0';
+            snprintf(sec, sizeof(sec), "%s", apara(p + 1));
+            continue;
+        }
+        char *ig = strchr(p, '=');
+        if (!ig || !*sec || !strstr(secoes, sec)) continue;
+        *ig = '\0';
+        snprintf(par, sizeof(par), "%s.%s=%s", sec, apara(p), apara(ig + 1));
+        r = cb(par, ctx);
+    }
+    fclose(fp);
+    for (int i = 2; !r && i < argc; i++) {
+        char *pt = strchr(argv[i], '.');
+        if (!strchr(argv[i], '=') || !pt) continue;
+        snprintf(sec, sizeof(sec), "%.*s", (int)(pt - argv[i]) < 31 ? (int)(pt - argv[i]) : 31, argv[i]);
+        if (strstr(secoes, sec)) r = cb(argv[i], ctx);
+    }
+    return r;
 }

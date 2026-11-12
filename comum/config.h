@@ -31,6 +31,8 @@ typedef struct {
     double comp_atraso_ms;                        /* prediz o estado este tempo à frente (com o último comando) antes do MPC */
     int estimador;                                /* 1: dθ2 pelo estimador com modelo no PC (estimador.h) */
     double est_L1, est_L2;
+    int embarcado;                                /* 1: controle no ESP32 (malha.exe) / como no ESP32 (sim.exe):
+                                                     atraso fixo de um período, controlador.h */
     double janela_equilibrio;                     /* |θ2| (rad) em que o modo equilíbrio assume */
 } ensaio;
 
@@ -47,5 +49,9 @@ void config_imprime(const config *c);
 int config_arg(config *c, const char *arg);
 /* Lê o .ini e aplica os argumentos com '=' a partir de argv[2]; os outros vão para *livre (o 1º). */
 int config_le_args(int argc, char **argv, config *c, const char **livre);
+/* Os pares "secao.chave=valor" do arquivo (seções em `secoes`, ex.: "fisico mpc ensaio") e depois os argumentos
+ * com '=' de argv[2..], na ordem: cb recebe cada um (para repassar a configuração ao firmware). */
+int config_pares(const char *arquivo, int argc, char **argv, const char *secoes,
+                 int (*cb)(const char *par, void *ctx), void *ctx);
 
 #endif

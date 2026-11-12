@@ -5,6 +5,7 @@
  * CSV: t, θ1, θ2, dθ1, dθ2 (o que o controle viu, como no malha.c), θ1_ref, u (torque), a (θ̈1 comandado), n_qp, n_it,
  *      dP, t_calc_ms e o estado verdadeiro: theta1_real, theta2_real, dtheta2_real */
 #include "config.h"
+#include "controlador.h"
 #include "estimador.h"
 #include "modelo.h"
 #include "periodo.h"
@@ -68,7 +69,14 @@ int main(int argc, char **argv)
         printf("motor: %g passos/volta | a ≤ %g, v ≤ %g, limite de software ±%g rad (0 = sem) | ressonância %g Hz, ζ %g\n",
                e->passos_rev, e->a_max_fw, e->v_max_fw, e->limite_fw, e->f_motor, e->zeta_motor);
     }
-    mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
+    mpc *c = NULL;
+    controlador ctl;                              /* ensaio.embarcado: o controlador do ESP32, atraso de 1 período */
+    if (e->embarcado) {
+        controlador_cria(&ctl, &cfg, x);
+        printf("modo embarcado: controlador.c, comando aplicado 1 período depois da amostra\n");
+    } else {
+        c = mpc_cria(&cfg.mpc, &m, x, 0.0);
+    }
     FILE *out = livre ? fopen(livre, "w") : NULL;
     if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,theta1_real,theta2_real,dtheta2_real\n");
 
@@ -80,12 +88,20 @@ int main(int argc, char **argv)
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
         double t0 = periodo_agora();
-        if (e->estimador) estimador_passo(&est, &m, xm, a_cmd, e->Ts);
-        double xc[4] = {xm[0], xm[1], xm[2], xm[3]};   /* compensação do atraso */
-        if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
-        double u = mpc_passo(c, xc, ref, &in);
+        double u, a;
+        if (e->embarcado) {
+            double xv[4] = {xm[0], xm[1], xm[2], xm[3]};
+            a = controlador_passo(&ctl, xv, t, &in);
+            u = ctl.u;
+            for (int i = 0; i < 4; i++) xm[i] = xv[i];   /* registra o que o controle viu */
+        } else {
+            if (e->estimador) estimador_passo(&est, &m, xm, a_cmd, e->Ts);
+            double xc[4] = {xm[0], xm[1], xm[2], xm[3]};   /* compensação do atraso */
+            if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
+            u = mpc_passo(c, xc, ref, &in);
+            a = modelo_acel_braco(&m, xc, u);
+        }
         double tc = (periodo_agora() - t0) * 1e3;
-        double a = modelo_acel_braco(&m, xc, u);
         a_cmd = a;
         soma_tc += tc;
         max_tc = fmax(max_tc, tc);
@@ -107,7 +123,7 @@ int main(int argc, char **argv)
         }
         /* 1 ms por vez: o comando novo entra após atraso_ms; o firmware lê o encoder e atualiza o observador */
         double ad = a + (ud - u) * 200;           /* distúrbio de torque ~ em aceleração (aprox.) */
-        int nms = (int)lround(e->Ts * 1e3), nat = (int)lround(e->atraso_ms);
+        int nms = (int)lround(e->Ts * 1e3), nat = e->embarcado ? nms : (int)lround(e->atraso_ms);
         if (nat > 200) nat = 200;
         for (int j = 0; j < nms; j++) fila[(tms + nat + j) & 255] = ad;
         for (int j = 0; j < nms; j++) {
@@ -155,6 +171,7 @@ int main(int argc, char **argv)
     printf("t_calc: médio %.2f ms, máx %.2f ms | QPs por passo: %.2f | máx |θ̈1| = %.1f rad/s²\n", soma_tc / (k ? k : 1), max_tc,
            soma_qp / (k ? k : 1), max_a);
     if (out) fclose(out);
-    mpc_libera(c);
+    if (e->embarcado) controlador_libera(&ctl);
+    else mpc_libera(c);
     return 0;
 }

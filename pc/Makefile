@@ -7,8 +7,8 @@ ifeq ($(OS),Windows_NT)
 LDLIBS += -lwinmm
 endif
 
-COMUM  = $(addprefix ../comum/,estimador.c qlpv_mpc.c modelo.c chronos.c)
-NUCLEO = $(COMUM) config.c periodo.c
+COMUM  = $(addprefix ../comum/,estimador.c qlpv_mpc.c modelo.c chronos.c config.c controlador.c)
+NUCLEO = $(COMUM) periodo.c
 HDRS   = *.h ../comum/*.h
 
 all: sim.exe malha.exe ident.exe sim_f.exe
@@ -28,8 +28,8 @@ obj_f/%.o: ../comum/%.c $(HDRS)
 	@mkdir -p obj_f
 	$(CC) $(CFLAGS) -DREAL_FLOAT -Werror=double-promotion -c -o $@ $<
 
-sim_f.exe: sim.c config.c periodo.c $(OBJF) $(HDRS)
-	$(CC) $(CFLAGS) -DREAL_FLOAT -o $@ sim.c config.c periodo.c $(OBJF) $(LDLIBS)
+sim_f.exe: sim.c periodo.c $(OBJF) $(HDRS)
+	$(CC) $(CFLAGS) -DREAL_FLOAT -o $@ sim.c periodo.c $(OBJF) $(LDLIBS)
 
 clean:
 	rm -rf *.exe *.csv obj_f
