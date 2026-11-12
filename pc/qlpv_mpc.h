@@ -41,6 +41,8 @@ typedef struct mpc mpc;
 
 mpc *mpc_cria(const mpc_config *cfg, const modelo *m, const double x0[4], double u_prev);
 void mpc_libera(mpc *c);
+/* Troca o limite de |Δu| sem recriar o controlador (mantém o warm start, projetado no limite novo). */
+void mpc_limite_du(mpc *c, double du_max);
 
 /* Um passo: x medido, ref (4, constante no horizonte). Devolve o torque u (saturado; 0 se não finito). */
 double mpc_passo(mpc *c, const double x[4], const double ref[4], mpc_info *info);

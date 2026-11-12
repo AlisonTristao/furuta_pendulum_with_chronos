@@ -30,6 +30,7 @@ typedef struct {
     int equilibrio;                               /* modo = equilibrio: o controle só assume perto do topo */
     double comp_atraso_ms;                        /* prediz o estado este tempo à frente (com o último comando) antes do MPC */
     int wrap_theta2;                              /* 1: θ2 dobrado em (-π, π] antes do MPC (sobe pelo lado mais perto) */
+    double janela_du;                             /* |θ2| (rad) em que entra o du_max_equilibrio (sai em 2×) */
     double wrap_hist;                             /* histerese do dobramento [rad]: troca de volta só em |θ2| > π + hist */
     int estimador;                                /* 1: dθ2 pelo estimador com modelo no PC (estimador.h) */
     double est_L1, est_L2;
@@ -40,6 +41,7 @@ typedef struct {
 typedef struct {
     fisico f;
     mpc_config mpc;
+    double du_max_eq;                             /* |Δu| máx. perto do topo (|θ2| < janela_du); 0 = sem troca */
     double u_max_eq, Rdu_eq;                      /* controle de equilíbrio (u ±u_max_eq); 0 = o mesmo do swing-up */
     ensaio e;
 } config;
