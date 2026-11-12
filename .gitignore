@@ -22,3 +22,6 @@ pc/obj_f/
 
 # Editor
 .vscode/
+
+# Gerado pelo CMake do firmware
+firmware/components/furuta/furuta_ini.c

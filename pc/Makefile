@@ -1,5 +1,6 @@
 # mingw32-make (Windows, MinGW-w64) ou make (Linux)
 # O controlador (CHRONOS, qlpv_mpc, modelo, estimador) fica em ../comum, compartilhado com o firmware.
+# O ensaio real é pelo TraceView (BTP, firmware/src/main.cpp); aqui fica só a simulação.
 CC      = gcc
 CFLAGS  = -O2 -std=c99 -Wall -Wextra -I../comum
 LDLIBS  = -lm
@@ -11,16 +12,10 @@ COMUM  = $(addprefix ../comum/,estimador.c qlpv_mpc.c modelo.c chronos.c config.
 NUCLEO = $(COMUM) periodo.c
 HDRS   = *.h ../comum/*.h
 
-all: sim.exe malha.exe ident.exe sim_f.exe
+all: sim.exe sim_f.exe
 
 sim.exe: sim.c $(NUCLEO) $(HDRS)
 	$(CC) $(CFLAGS) -o $@ sim.c $(NUCLEO) $(LDLIBS)
-
-malha.exe: malha.c furuta_serial.c serial.c $(NUCLEO) $(HDRS)
-	$(CC) $(CFLAGS) -o $@ malha.c furuta_serial.c serial.c $(NUCLEO) $(LDLIBS)
-
-ident.exe: ident.c furuta_serial.c serial.c $(NUCLEO) $(HDRS)
-	$(CC) $(CFLAGS) -o $@ ident.c furuta_serial.c serial.c $(NUCLEO) $(LDLIBS)
 
 # simulação com o controlador em float, como no ESP32 (planta e o resto continuam em double)
 OBJF = $(patsubst ../comum/%.c,obj_f/%.o,$(COMUM))

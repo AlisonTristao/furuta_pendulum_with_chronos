@@ -2,6 +2,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <stddef.h>
+
 #include "modelo.h"
 #include "qlpv_mpc.h"
 
@@ -45,6 +47,9 @@ typedef struct {
 
 /* Lê o arquivo (NULL = só padrões). Devolve 0 se ok; imprime chaves desconhecidas em stderr. */
 int config_le(const char *arquivo, config *c);
+/* Idem com o conteúdo do .ini na memória (firmware: o pc/furuta.ini embutido), sem imprimir nada; devolve -1 se
+ * alguma chave não foi reconhecida (as outras são aplicadas). */
+int config_le_texto(const char *texto, size_t n, config *c);
 void config_imprime(const config *c);
 /* "secao.chave=valor" da linha de comando (ex.: mpc.u_max=1.25). Devolve 0 se ok. */
 int config_arg(config *c, const char *arg);

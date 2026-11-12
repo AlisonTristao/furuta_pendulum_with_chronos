@@ -1,3 +1,5 @@
 cmake_minimum_required(VERSION 3.16.0)
+# BTPDevice, BTP e TinyShell vêm dos checkouts vizinhos (c:/git/BTPDevice, c:/git/BTP, c:/git/TinyShell)
+include(${CMAKE_CURRENT_LIST_DIR}/../../BTPDevice/test_apps/btpdev_components.cmake)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(furuta_esp32 VERSION 0.1.0)
+project(furuta_esp32s3 VERSION 0.2.0)

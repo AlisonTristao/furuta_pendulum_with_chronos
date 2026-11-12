@@ -55,7 +55,7 @@ void stepper_init(void)
     gpio_config_t out = {
         .pin_bit_mask = (1ULL << PIN_STEP) | (1ULL << PIN_DIR) | (1ULL << PIN_EN) |
                         (1ULL << PIN_M0) | (1ULL << PIN_M1) | (1ULL << PIN_M2),
-        .mode = GPIO_MODE_OUTPUT,
+        .mode = GPIO_MODE_INPUT_OUTPUT,             // lê o nível de volta (pinos -motor devolve o DIR igual)
     };
     gpio_config(&out);
     gpio_set_level(PIN_EN, 1);                      // começa desligado

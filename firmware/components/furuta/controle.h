@@ -10,7 +10,7 @@ typedef struct {
     float t1, t2, dt1, dt2;   // theta1 (braço), theta2 (pêndulo, 0 = topo) e velocidades
 } leitura_t;
 
-void controle_init(void);     // cria a tarefa (núcleo 1) e espera o hardware subir
+void controle_init(void);     // cria a tarefa (núcleo 0) e espera o hardware subir
 
 estado_t controle_estado(void);
 const char *controle_estado_nome(estado_t e);

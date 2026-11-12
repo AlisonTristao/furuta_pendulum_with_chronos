@@ -3,10 +3,19 @@ CONFIG_FREERTOS_HZ=1000
 
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 
-# A UART0 é do protocolo: logs desligados. O console fica na UART0 (CONFIG_ESP_CONSOLE_NONE=y
-# deixava o app reiniciando em loop no ESP-IDF 6.0.1); com logs NONE nada sai nele, só um pânico.
+# A USB nativa é do BTP (TinyUSB CDC). Logs e console na UART0, que não está ligada a nada: logs desligados
+# (um ESP_LOG bloquearia a tarefa que o chama). Erros da BTPDevice: `btp -errors` no terminal do TraceView.
+CONFIG_TINYUSB_CDC_ENABLED=y
+CONFIG_TINYUSB_CDC_COUNT=1
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
 CONFIG_LOG_DEFAULT_LEVEL_NONE=y
 CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+CONFIG_BTPDEV_LOG_LEVEL_NONE=y
+
+# Só o link Serial: sem Wi-Fi, BLE e ESP-NOW
+# CONFIG_BTPDEV_LINK_TCP is not set
+# CONFIG_BTPDEV_LINK_ESPNOW is not set
+
 
 # ISR do gerador de passos em IRAM
 CONFIG_GPTIMER_ISR_HANDLER_IN_IRAM=y

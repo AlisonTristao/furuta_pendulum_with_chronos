@@ -3,23 +3,22 @@
 
 #include "driver/gpio.h"
 
-// ---------------------------------------------------------------- pinos
-#define PIN_STEP     GPIO_NUM_25
-#define PIN_DIR      GPIO_NUM_26
-#define PIN_EN       GPIO_NUM_27   // DRV8825 nENABLE: 0 = driver ligado
-#define PIN_FLT      GPIO_NUM_34   // DRV8825 nFAULT: 0 = falha (só entrada, SEM pull-up interno)
-#define PIN_M0       GPIO_NUM_32
-#define PIN_M1       GPIO_NUM_33
-#define PIN_M2       GPIO_NUM_13
-#define PIN_FIM_NEG  GPIO_NUM_18   // fim de curso do lado theta1 < 0
-#define PIN_FIM_POS  GPIO_NUM_19   // fim de curso do lado theta1 > 0
-#define PIN_SDA      GPIO_NUM_21
-#define PIN_SCL      GPIO_NUM_22
-// SLP = RST = 3,3 V (sempre acordado). VP (GPIO36) não é usado.
-
-// ---------------------------------------------------------------- serial
-#define SERIAL_BAUD      921600
-#define SERIAL_LINHA_MAX 160
+// ---------------------------------------------------------------- pinos (ESP32-S3)
+// PROVISÓRIOS: a placa nova ainda não foi montada; trocar pelos pinos definitivos. Evitar no S3: 19/20 (USB
+// nativa, é o link BTP), 0/3/45/46 (strapping), 26-32 (flash) e 33-37 (PSRAM octal dos módulos R8).
+// No ESP32 clássico eram: STEP 25, DIR 26, EN 27, FLT 34, M0 32, M1 33, M2 13, FIM 18/19, SDA 21, SCL 22.
+#define PIN_STEP     GPIO_NUM_4
+#define PIN_DIR      GPIO_NUM_5
+#define PIN_EN       GPIO_NUM_6    // DRV8825 nENABLE: 0 = driver ligado
+#define PIN_FLT      GPIO_NUM_7    // DRV8825 nFAULT: 0 = falha (SEM pull-up interno)
+#define PIN_M0       GPIO_NUM_15
+#define PIN_M1       GPIO_NUM_16
+#define PIN_M2       GPIO_NUM_17
+#define PIN_FIM_NEG  GPIO_NUM_10   // fim de curso do lado theta1 < 0
+#define PIN_FIM_POS  GPIO_NUM_11   // fim de curso do lado theta1 > 0
+#define PIN_SDA      GPIO_NUM_8
+#define PIN_SCL      GPIO_NUM_9
+// SLP = RST = 3,3 V (sempre acordado).
 
 // ---------------------------------------------------------------- motor
 #define MOTOR_PASSOS_VOLTA 200      // passos inteiros por volta
@@ -38,7 +37,7 @@
 #define HOMING_V           1.5f     // rad/s
 #define HOMING_A           10.0f    // rad/s²
 #define HOMING_CURSO_MAX   7.0f     // rad: desiste se não achar a chave nesse curso
-#define LIM_SEM_HOMING_RAD 0.5f     // limite de software quando a origem é definida com 'O'
+#define LIM_SEM_HOMING_RAD 0.5f     // limite de software quando a origem é definida sem homing (furuta -origem)
 
 // ---------------------------------------------------------------- encoder
 #define ENC_SINAL          1        // -1 inverte o sentido de theta2

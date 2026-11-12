@@ -132,6 +132,51 @@ static void pendulo_composto(fisico *f, double mh, double L, double mp)
     f->I2 = mh * L * L / 12 + mh * dh * dh + mp * dp * dp;
 }
 
+typedef struct {
+    char sec[32];
+    int erros, tem_geo;
+    double geo[3];   /* m_haste, L_haste, m_ponta */
+} leitor;
+
+/* Uma linha do .ini. nome = NULL: não imprime os erros (firmware), só conta. */
+static void le_linha(config *c, leitor *l, char *linha, const char *nome)
+{
+    char *p = strpbrk(linha, ";#");
+    if (p) *p = '\0';
+    p = apara(linha);
+    if (!*p) return;
+    if (*p == '[') {
+        char *f = strchr(p, ']');
+        if (f) *f = '\0';
+        snprintf(l->sec, sizeof(l->sec), "%s", apara(p + 1));
+        return;
+    }
+    char *ig = strchr(p, '=');
+    if (!ig) return;
+    *ig = '\0';
+    char *k = apara(p), *v = apara(ig + 1);
+    if (!strcmp(l->sec, "pendulo")) {            /* geometria: calcula m2, l2, I2 no fim */
+        if (!strcmp(k, "m_haste")) l->geo[0] = atof(v), l->tem_geo = 1;
+        else if (!strcmp(k, "L_haste")) l->geo[1] = atof(v), l->tem_geo = 1;
+        else if (!strcmp(k, "m_ponta")) l->geo[2] = atof(v), l->tem_geo = 1;
+        else {
+            if (nome) fprintf(stderr, "%s: chave desconhecida: [%s] %s\n", nome, l->sec, k);
+            l->erros++;
+        }
+        return;
+    }
+    if (aplica(c, l->sec, k, v)) {
+        if (nome) fprintf(stderr, "%s: chave desconhecida ou valor inválido: [%s] %s = %s\n", nome, l->sec, k, v);
+        l->erros++;
+    }
+}
+
+static int fim_leitura(config *c, const leitor *l)
+{
+    if (l->tem_geo) pendulo_composto(&c->f, l->geo[0], l->geo[1], l->geo[2]);
+    return l->erros ? -1 : 0;
+}
+
 int config_le(const char *arquivo, config *c)
 {
     padroes(c);
@@ -141,42 +186,30 @@ int config_le(const char *arquivo, config *c)
         fprintf(stderr, "não abriu %s\n", arquivo);
         return -1;
     }
-    char linha[256], sec[32] = "";
-    int erros = 0, tem_geo = 0;
-    double geo[3] = {0, 0, 0};   /* m_haste, L_haste, m_ponta */
-    while (fgets(linha, sizeof(linha), fp)) {
-        char *p = strpbrk(linha, ";#");
-        if (p) *p = '\0';
-        p = apara(linha);
-        if (!*p) continue;
-        if (*p == '[') {
-            char *f = strchr(p, ']');
-            if (f) *f = '\0';
-            snprintf(sec, sizeof(sec), "%s", apara(p + 1));
-            continue;
-        }
-        char *ig = strchr(p, '=');
-        if (!ig) continue;
-        *ig = '\0';
-        char *k = apara(p), *v = apara(ig + 1);
-        if (!strcmp(sec, "pendulo")) {           /* geometria: calcula m2, l2, I2 no fim */
-            if (!strcmp(k, "m_haste")) geo[0] = atof(v), tem_geo = 1;
-            else if (!strcmp(k, "L_haste")) geo[1] = atof(v), tem_geo = 1;
-            else if (!strcmp(k, "m_ponta")) geo[2] = atof(v), tem_geo = 1;
-            else {
-                fprintf(stderr, "%s: chave desconhecida: [%s] %s\n", arquivo, sec, k);
-                erros++;
-            }
-            continue;
-        }
-        if (aplica(c, sec, k, v)) {
-            fprintf(stderr, "%s: chave desconhecida ou valor inválido: [%s] %s = %s\n", arquivo, sec, k, v);
-            erros++;
-        }
-    }
+    char linha[256];
+    leitor l = {"", 0, 0, {0, 0, 0}};
+    while (fgets(linha, sizeof(linha), fp)) le_linha(c, &l, linha, arquivo);
     fclose(fp);
-    if (tem_geo) pendulo_composto(&c->f, geo[0], geo[1], geo[2]);
-    return erros ? -1 : 0;
+    return fim_leitura(c, &l);
+}
+
+int config_le_texto(const char *texto, size_t n, config *c)
+{
+    padroes(c);
+    char linha[256];
+    leitor l = {"", 0, 0, {0, 0, 0}};
+    size_t i = 0;
+    while (i < n && texto[i]) {
+        size_t k = 0;
+        while (i < n && texto[i] && texto[i] != '\n') {
+            if (k < sizeof(linha) - 1) linha[k++] = texto[i];
+            i++;
+        }
+        if (i < n && texto[i] == '\n') i++;
+        linha[k] = '\0';
+        le_linha(c, &l, linha, NULL);
+    }
+    return fim_leitura(c, &l);
 }
 
 int config_arg_silencioso(config *c, const char *arg)
