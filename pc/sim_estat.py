@@ -35,6 +35,7 @@ def roda(csv, extra, dur):
     D = G.le(csv); M = G.metricas(D)
     if M is not None:
         M["rug"], M["erro"] = rugosidade(D)
+        M["t1_fim"] = D["theta1"][D["t"] > D["t"][-1] - 5].mean()   # θ1 médio nos últimos 5 s
     return M
 
 
@@ -59,7 +60,7 @@ def main(argv):
             v = np.array([r[k] for r in res])
             return f"{fmt.format(np.nanmedian(v))} ({fmt.format(np.nanmin(v))}–{fmt.format(np.nanmax(v))})" if len(v) else "–"
         print(f"{nome:18s} N={n} não subiu {n - len(res)} | 1ª passagem {f('subida', '{:.1f}')} s | captura {f('captura', '{:.1f}')} s | topo {f('topo', '{:.0f}')}% | quedas {f('quedas', '{:.0f}')} | "
-              f"rms θ2 {f('rms_t2', '{:.1f}')}° | osc θ1 {f('osc_t1', '{:.2f}')} rad | rms Δu {f('rms_du', '{:.3f}')} | rms a {f('rms_a', '{:.0f}')} | erro dθ2 {f('erro', '{:.2f}')} | "
+              f"rms θ2 {f('rms_t2', '{:.1f}')}° | osc θ1 {f('osc_t1', '{:.2f}')} rad | rms Δu {f('rms_du', '{:.3f}')} | θ1 fim {f('t1_fim', '{:+.2f}')} | rms a {f('rms_a', '{:.0f}')} | erro dθ2 {f('erro', '{:.2f}')} | "
               f"rug {f('rug', '{:.1f}')}")
     return 0
 

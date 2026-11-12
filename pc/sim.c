@@ -72,10 +72,11 @@ int main(int argc, char **argv)
     mpc_config cfg_eq = config_mpc_equilibrio(&cfg);
     int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), em_eq = 0, n_trocas = 0;
     double u_ant = 0;
-    long volta = 0;                               /* dobramento de θ2 (wrap_theta2) */
+    long volta = 0;
+    double off_th2 = 0;                           /* offset de θ2 estimado (offset_tau) */                               /* dobramento de θ2 (wrap_theta2) */
     mpc *c = mpc_cria(&cfg.mpc, &m, x, 0.0);
     FILE *out = livre ? fopen(livre, "w") : NULL;
-    if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,eq,theta1_real,theta2_real,dtheta2_real\n");
+    if (out) fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,eq,theta1_real,theta2_real,dtheta2_real,off_th2\n");
 
     int K = (int)lround(e->duracao / e->Ts);
     double t_up = -1, soma_tc = 0, max_tc = 0, soma_qp = 0, max_a = 0;
@@ -85,6 +86,14 @@ int main(int argc, char **argv)
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
         double t0 = periodo_agora();
+        if (e->offset_tau > 0) {                      /* offset do zero de θ2: no equilíbrio a média do θ2 é o offset */
+            xm[1] -= off_th2;
+            double th = xm[1] - 2 * PI * floor((xm[1] + PI) / (2 * PI));
+            if (fabs(th) < e->offset_janela) {
+                off_th2 += e->Ts / e->offset_tau * th;
+                off_th2 = fmax(-e->offset_max, fmin(e->offset_max, off_th2));
+            }
+        }
         if (e->estimador) estimador_passo(&est, &m, xm, a_cmd, e->Ts);
         double xc[4] = {xm[0], xm[1], xm[2], xm[3]};   /* compensação do atraso */
         if (e->comp_atraso_ms > 0) modelo_passo_acel(&m, xc, a_cmd, e->comp_atraso_ms * 1e-3, 4);
@@ -112,8 +121,8 @@ int main(int argc, char **argv)
         soma_qp += in.n_qp;
         max_a = fmax(max_a, fabs(a));
         if (out)
-            fprintf(out, "%.4f,%.10g,%.10g,%.10g,%.10g,%.6g,%.12g,%.8g,%d,%d,%.3e,%.4f,%d,%.10g,%.10g,%.10g\n", t, xm[0],
-                    xm[1], xm[2], xm[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tc, em_eq, x[0], x[1], x[3]);
+            fprintf(out, "%.4f,%.10g,%.10g,%.10g,%.10g,%.6g,%.12g,%.8g,%d,%d,%.3e,%.4f,%d,%.10g,%.10g,%.10g,%.6g\n", t, xm[0],
+                    xm[1], xm[2], xm[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tc, em_eq, x[0], x[1], x[3], off_th2);
         if (t_up < 0 && fabs(wrap(x[1])) < 0.1 && fabs(x[3]) < 0.5) t_up = t;
         if (!in.finito) {
             printf("controle não finito em t = %.2f s\n", t);
@@ -159,6 +168,7 @@ int main(int argc, char **argv)
             /* θ1 medido = passos inteiros (acumulador do gerador de passos trunca); dθ1 = velocidade comandada */
             th1_med = ppr > 0 ? floor(th1c * ppr) / ppr : th1c;
             double ang = x[1] + (e->ruido_enc > 0 ? e->ruido_enc * q * gauss() : 0);
+            ang += e->offset_enc;                       /* zero do encoder fora da vertical */
             double med = q > 0 ? q * floor(ang / q) : ang;
             if (e->obs_hz > 0) {
                 double wn = 2 * PI * e->obs_hz, er = med - th_est;

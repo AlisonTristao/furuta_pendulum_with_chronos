@@ -24,6 +24,8 @@ static void padroes(config *c)
     e.usa_limite_homing = 1;
     e.theta2_aborta = 60;
     e.janela_equilibrio = 0.15;
+    e.offset_janela = 0.15;
+    e.offset_max = 0.035;
     e.est_L1 = 0.5;
     e.est_L2 = 20;
     c->e = e;
@@ -90,6 +92,8 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
     INT("ensaio", "estimador", c->e.estimador) INT("ensaio", "wrap_theta2", c->e.wrap_theta2) NUM("ensaio", "wrap_hist", c->e.wrap_hist) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
     NUM("ensaio", "est_L1_topo", c->e.est_L1_topo) NUM("ensaio", "est_L2_topo", c->e.est_L2_topo) NUM("ensaio", "est_janela", c->e.est_janela)
+    NUM("ensaio", "offset_tau", c->e.offset_tau) NUM("ensaio", "offset_janela", c->e.offset_janela)
+    NUM("ensaio", "offset_max", c->e.offset_max) NUM("sim", "offset_enc", c->e.offset_enc)
     NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) NUM("ensaio", "troca_equilibrio", c->e.troca_equilibrio)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;

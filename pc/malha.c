@@ -179,7 +179,8 @@ int main(int argc, char **argv)
     int troca = e->troca_equilibrio > 0 && (cfg.u_max_eq > 0 || cfg.Rdu_eq > 0), n_trocas = 0;
     int em_eq = troca && e->equilibrio;
     double u_ant = 0;
-    long volta = 0;                               /* dobramento de θ2 (wrap_theta2) */
+    long volta = 0;
+    double off_th2 = 0;                           /* offset de θ2 estimado (offset_tau) */                               /* dobramento de θ2 (wrap_theta2) */
     mpc *c = mpc_cria(em_eq ? &cfg_eq : &cfg.mpc, &m, x, 0.0);
     FILE *out = fopen(arq, "w");
     if (!out) {
@@ -187,7 +188,7 @@ int main(int argc, char **argv)
         encerra(f);
         return 1;
     }
-    fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,t_ciclo_ms,atraso_ms,eq\n");
+    fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,dP,t_calc_ms,t_ciclo_ms,atraso_ms,eq,off_th2\n");
 
     periodo_prioridade_alta();
     periodo *p = periodo_cria(e->Ts);
@@ -209,6 +210,14 @@ int main(int argc, char **argv)
             break;
         }
         x[1] -= off2;
+        if (e->offset_tau > 0) {                      /* offset do zero de θ2: no equilíbrio a média do θ2 é o offset */
+            x[1] -= off_th2;
+            double th = x[1] - 2 * PI * floor((x[1] + PI) / (2 * PI));
+            if (fabs(th) < e->offset_janela) {
+                off_th2 += e->Ts / e->offset_tau * th;
+                off_th2 = fmax(-e->offset_max, fmin(e->offset_max, off_th2));
+            }
+        }
         if (e->estimador) estimador_passo(&est, &m, x, a_cmd, e->Ts);   /* x[3] passa a ser o estimado */
         double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
         mpc_info in;
@@ -241,8 +250,8 @@ int main(int argc, char **argv)
         double xa[4];
         st = furuta_acel(f, a, xa, 10);
         double tciclo = (periodo_agora() - ti) * 1e3;
-        fprintf(out, "%.4f,%.6f,%.6f,%.5f,%.5f,%.5f,%.6f,%.4f,%d,%d,%.3e,%.4f,%.4f,%.4f,%d\n", t, x[0], x[1], x[2],
-                x[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tcalc, tciclo, atraso, em_eq);
+        fprintf(out, "%.4f,%.6f,%.6f,%.5f,%.5f,%.5f,%.6f,%.4f,%d,%d,%.3e,%.4f,%.4f,%.4f,%d,%.6f\n", t, x[0], x[1], x[2],
+                x[3], ref[0], u, a, in.n_qp, in.n_it, in.dP, tcalc, tciclo, atraso, em_eq, off_th2);
         if (st != FURUTA_OK) {
             motivo = st == FURUTA_ERR ? "o firmware recusou o comando (ver estado)" : "envio do comando falhou";
             break;
