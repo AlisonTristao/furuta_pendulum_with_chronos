@@ -17,6 +17,9 @@ CONFIG_BTPDEV_LOG_LEVEL_NONE=y
 # CONFIG_BTPDEV_LINK_ESPNOW is not set
 
 
+# app_main chama o device.begin() da BTPDevice (o padrão de 3584 B é pouco)
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
 # ISR do gerador de passos em IRAM
 CONFIG_GPTIMER_ISR_HANDLER_IN_IRAM=y
 

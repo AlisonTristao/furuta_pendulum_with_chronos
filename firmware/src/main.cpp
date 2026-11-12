@@ -29,6 +29,7 @@ extern "C" {
 #include "saida.h"
 }
 
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -254,9 +255,19 @@ void saida_btp(int aviso, const char* texto) {
 }  // namespace
 
 extern "C" void app_main(void) {
+    static const char* TAG = "furuta";
+#ifdef FURUTA_DEBUG_BOOT   // esp32s3_debug: o console (USB-JTAG) fica visível antes de o TinyUSB tomar a USB
+    for (int i = 4; i > 0; i--) {
+        ESP_LOGI(TAG, "boot: BTP em %d s", i);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+#endif
+    ESP_LOGI(TAG, "controle_init");
     controle_init();   // malha de 1 kHz e ISR dos passos no núcleo 0
+    ESP_LOGI(TAG, "embarcado_init");
     embarcado_init();  // configuração = pc/furuta.ini embutido; tarefa do MPC no núcleo 1
     saida_registra(saida_btp);
+    ESP_LOGI(TAG, "device.begin (a USB passa para o TinyUSB)");
     device.begin();    // falha: a causa fica em device.last_error() (sem USB não há como mostrar)
     xTaskCreatePinnedToCore(tarefa_telemetria, "telemetria", 4096, nullptr, 4, nullptr, 0);
 }

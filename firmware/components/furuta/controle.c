@@ -6,6 +6,7 @@
 
 #include <math.h>
 
+#include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -126,8 +127,12 @@ static void processa_pedidos(int32_t passos)
 
 static void tarefa(void *arg)
 {
+    static const char *TAG = "controle";
+    ESP_LOGI(TAG, "stepper_init");
     stepper_init();
-    encoder_init();
+    ESP_LOGI(TAG, "encoder_init");
+    esp_err_t enc = encoder_init();
+    ESP_LOGI(TAG, "encoder: %s (%s)", encoder_nome(), esp_err_to_name(enc));
     gpio_config_t in = {
         .pin_bit_mask = (1ULL << PIN_FIM_NEG) | (1ULL << PIN_FIM_POS),
         .mode = GPIO_MODE_INPUT,
@@ -137,6 +142,7 @@ static void tarefa(void *arg)
     gpio_config(&in);
     gpio_config_t flt = {.pin_bit_mask = 1ULL << PIN_FLT, .mode = GPIO_MODE_INPUT};
     gpio_config(&flt);
+    ESP_LOGI(TAG, "entradas ok, laço de %d Hz", CTRL_HZ);
     s_pronto_init = true;
 
     const float dt = 1.0f / CTRL_HZ;
