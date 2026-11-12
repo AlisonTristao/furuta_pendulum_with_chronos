@@ -29,6 +29,8 @@ extern "C" {
 #include "saida.h"
 }
 
+#include "gravacao.h"
+
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -71,6 +73,12 @@ public:
                 return uint8_t{RESULT_OK};
             }, "furuta -stop: para o ensaio")
             .add("bench", [] { return liga(3); }, "furuta -bench: tempo do MPC com a config em uso (planta simulada)")
+            .add("gravar", [] {
+                if (embarcado_ativo()) return err("tem um ensaio rodando");
+                btpdev::printf("reiniciando no modo de gravação: feche a porta e rode pio run -t upload\n");
+                gravacao_reinicia_depois();
+                return uint8_t{RESULT_OK};
+            }, "furuta -gravar: reinicia no modo de gravação (sem BOOT/RESET)")
             .add("ident", [](float l2) {
                 const char* e = ident_roda(l2);
                 return e ? err(e) : uint8_t{RESULT_OK};
@@ -269,5 +277,6 @@ extern "C" void app_main(void) {
     saida_registra(saida_btp);
     ESP_LOGI(TAG, "device.begin (a USB passa para o TinyUSB)");
     device.begin();    // falha: a causa fica em device.last_error() (sem USB não há como mostrar)
+    gravacao_init();   // toque de 1200 baud -> modo de gravação (pio run -t upload sem os botões)
     xTaskCreatePinnedToCore(tarefa_telemetria, "telemetria", 4096, nullptr, 4, nullptr, 0);
 }
