@@ -4,7 +4,8 @@
 set(COMUM ${CMAKE_CURRENT_LIST_DIR}/../../../comum)
 idf_component_register(SRCS ${COMUM}/chronos.c ${COMUM}/qlpv_mpc.c ${COMUM}/modelo.c ${COMUM}/estimador.c
                             ${COMUM}/config.c ${COMUM}/controlador.c
-                       INCLUDE_DIRS ${COMUM})
+                       INCLUDE_DIRS ${COMUM}
+                       LDFRAGMENTS linker.lf)   # tudo na RAM (linker.lf)
 target_compile_definitions(${COMPONENT_LIB} PUBLIC REAL_FLOAT CHRONOS_FIXO)   # FIXO: tamanhos constantes (chronos.c)
 set(MPC_OPT "$ENV{MPC_OPT}")
 if(NOT MPC_OPT)

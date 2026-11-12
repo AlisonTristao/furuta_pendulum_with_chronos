@@ -20,6 +20,14 @@ CONFIG_BTPDEV_LOG_LEVEL_NONE=y
 # app_main chama o device.begin() da BTPDevice (o padrão de 3584 B é pouco)
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
+# Cache e flash do S3 (N16R8: flash quad): o padrão (I-cache 16 KB, DIO) deixava o MPC 4x mais lento que no ESP32.
+# O controlador em si roda da RAM (components/mpc/linker.lf); isto vale para o resto (libm, BTP).
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
+CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_32B=y
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
 # ISR do gerador de passos em IRAM
 CONFIG_GPTIMER_ISR_HANDLER_IN_IRAM=y
 

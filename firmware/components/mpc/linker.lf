@@ -1,0 +1,7 @@
+# Controlador inteiro (CHRONOS, qlpv_mpc, modelo, estimador, controlador) na IRAM/DRAM: no S3 o código quente do
+# MPC (~25 KB, chronos_resolve sozinho 13,6 KB com -O3) não cabe na cache de instruções, e rodando da flash cada
+# iteração de Newton custava ~4x o do ESP32 clássico. Na RAM o tempo também fica determinístico.
+[mapping:mpc]
+archive: libmpc.a
+entries:
+    * (noflash)
