@@ -28,3 +28,10 @@ void controle_zera_pendulo(void);  // pêndulo parado embaixo: theta2 = pi
 void controle_habilita(bool ligado);
 float controle_meio_curso(void);
 float controle_limite(void);       // limite de software de |theta1|
+
+// Controle embarcado: a cada periodo_ms a malha guarda a leitura daquele instante e notifica `tarefa`
+// (xTaskNotifyGive); NULL cancela. controle_amostra devolve a última leitura guardada.
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+void controle_assina_amostra(TaskHandle_t tarefa, int periodo_ms);
+void controle_amostra(leitura_t *x);

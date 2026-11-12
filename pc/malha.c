@@ -61,6 +61,86 @@ static void espera_enter(const char *msg)
     }
 }
 
+static int envia_par(const char *par, void *ctx)
+{
+    char cmd[200], r[128];
+    snprintf(cmd, sizeof(cmd), "P%s", par);
+    if (furuta_comando((furuta *)ctx, cmd, r, sizeof(r), 300) != FURUTA_OK) {
+        fprintf(stderr, "o firmware recusou %s (%s)%s\n", par, r,
+                !strncmp(r, "ERR,CMD", 7) ? ": grave o firmware novo (controle embarcado)" : "");
+        return -1;
+    }
+    return 0;
+}
+
+/* Controle no ESP32 (ensaio.embarcado = 1, ou 2 = a seco): manda M1/M2 e grava a telemetria até "M,FIM". */
+static int roda_embarcado(furuta *f, const config *cfg, int modo, const char *arq)
+{
+    const ensaio *e = &cfg->e;
+    char r[256];
+    FILE *out = fopen(arq, "w");
+    if (!out) {
+        fprintf(stderr, "não abriu %s\n", arq);
+        return 1;
+    }
+    fprintf(out, "t,theta1,theta2,dtheta1,dtheta2,theta1_ref,u,a,n_qp,n_it,t_calc_ms,estouros\n");
+    if (furuta_comando(f, modo == 1 ? "M1" : "M2", r, sizeof(r), 300) != FURUTA_OK) {
+        fprintf(stderr, "o firmware não ligou o controle: %s\n", r);
+        fclose(out);
+        return 1;
+    }
+    if (modo == 1 && e->equilibrio)
+        printf("\nLEVE O PÊNDULO ATÉ O TOPO com a mão. O controle assume quando |θ2| < %.2f rad e |dθ2| < 2 rad/s.\n",
+               e->janela_equilibrio);
+    else if (modo == 1)
+        printf("esperando o pêndulo parar embaixo (a homing balança ele)...\n");
+    else
+        printf("A SECO: o MPC calcula com os sensores, sem mexer no motor\n");
+    int n = 0, desligou = 0;
+    double soma = 0, maxc = 0;
+    const char *motivo = "?";
+    static char fim[256];
+    for (;;) {
+        if (g_parar && !desligou) {
+            furuta_envia(f, "M0");
+            desligou = 1;
+        }
+        int st = furuta_linha(f, r, sizeof(r), 1000);
+        if (st == FURUTA_PRAZO) {
+            if (n > 0 || desligou) {
+                motivo = "sem telemetria por 1 s";
+                break;
+            }
+            continue;                           /* esperando a condição de partida */
+        }
+        if (st == FURUTA_REINICIOU) {
+            motivo = "o ESP32 reiniciou";
+            break;
+        }
+        if (!strncmp(r, "T,", 2)) {
+            double v[11];
+            if (sscanf(r + 2, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5],
+                       &v[6], &v[7], &v[8], &v[9], &v[10]) == 11) {
+                double ref = v[0] >= e->t_degrau ? e->theta1_degrau : e->theta1_ref;
+                fprintf(out, "%.3f,%.5f,%.5f,%.4f,%.4f,%.5f,%.5f,%.3f,%.0f,%.0f,%.3f,%.0f\n", v[0], v[1], v[2], v[3],
+                        v[4], ref, v[5], v[6], v[7], v[8], v[9], v[10]);
+                n++, soma += v[9], maxc = fmax(maxc, v[9]);
+            }
+        } else if (!strncmp(r, "M,LIGADO", 8)) {
+            printf("controle ligado (no ESP32)\n");
+        } else if (!strncmp(r, "M,FIM", 5)) {
+            snprintf(fim, sizeof(fim), "%s", r + 6);
+            motivo = fim;
+            break;
+        }
+    }
+    fclose(out);
+    printf("\nparou: %s (%d períodos, %.2f s)\n", motivo, n, n * e->Ts);
+    if (n > 0) printf("MPC no ESP32: %.2f ms médio, %.2f ms máx\n", soma / n, maxc);
+    printf("dados: %s\n", arq);
+    return 0;
+}
+
 /* Para o braço e desliga o driver. */
 static void encerra(furuta *f)
 {
@@ -109,6 +189,10 @@ int main(int argc, char **argv)
     printf("ESP32: %s\n", r);
 
     config_imprime(&cfg);
+    if (e->embarcado) {   /* o ESP32 recebe a mesma configuração: [fisico], [mpc], [ensaio] e os argumentos */
+        if (config_pares(argv[1], argc, argv, "fisico mpc ensaio", envia_par, f)) return 1;
+        printf("configuração enviada ao ESP32: o controle roda nele (%s)\n", e->embarcado == 2 ? "A SECO" : "embarcado");
+    }
     printf("\nModo %s, %.0f s, Ts = %.0f ms.\n", e->equilibrio ? "EQUILÍBRIO" : "SWING-UP", e->duracao, e->Ts * 1e3);
     espera_enter("1) Deixe o pêndulo PARADO, pendurado embaixo, e aperte Enter (zera o encoder)... ");
     furuta_comando(f, "Z", r, sizeof(r), 300);
@@ -120,8 +204,13 @@ int main(int argc, char **argv)
     printf("   θ2 = %.3f (pi = embaixo)\n", x[1]);
     espera_enter("2) Enter para começar: homing e, em seguida, o controle (Ctrl+C para parar)... ");
 
-    /* homing: limite de θ1. Daqui em diante sempre há comando a cada <= 20 ms (o driver não desliga) */
     signal(SIGINT, ao_ctrl_c);
+    if (e->embarcado == 2) {                      /* a seco: sem homing, o motor não mexe */
+        int ret = roda_embarcado(f, &cfg, 2, arq);
+        furuta_desconecta(f);
+        return ret;
+    }
+    /* homing: limite de θ1. Daqui em diante sempre há comando a cada <= 20 ms (o driver não desliga) */
     printf("homing (o braço vai até os dois fins de curso e volta ao meio)...\n");
     if (furuta_comando(f, "H", r, sizeof(r), 60000) != FURUTA_OK) {
         fprintf(stderr, "homing falhou: %s\n", r);
@@ -135,6 +224,14 @@ int main(int argc, char **argv)
         cfg.mpc.theta1_max = lim - e->margem_theta1;
         cfg.mpc.theta1_min = -cfg.mpc.theta1_max;
         printf("restrição de θ1 do MPC: ±%.3f rad\n", cfg.mpc.theta1_max);
+    }
+    if (e->embarcado) {                           /* o ESP32 espera a partida e controla; aqui só grava */
+        int ret = roda_embarcado(f, &cfg, 1, arq);
+        furuta_comando(f, "S", r, sizeof(r), 300);
+        printf("ESP32: %s\n", r);
+        encerra(f);
+        furuta_desconecta(f);
+        return ret;
     }
 
     /* espera a condição de partida mandando aceleração 0 (braço parado no meio) */

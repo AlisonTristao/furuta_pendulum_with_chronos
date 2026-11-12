@@ -54,6 +54,23 @@ struct chronos {
     real *delta_u, *delta_se, *delta_g_0, *delta_g_k, *delta_g_ter, *delta_v_k, *delta_v_ter;
 };
 
+/* Tamanhos: com CHRONOS_FIXO (firmware) viram constantes de compilação e o compilador desenrola os laços curtos
+ * (no ESP32 o laço genérico custava ~16 ciclos por multiplicação-soma). Valores do NMPC do Furuta: 4 estados,
+ * 1 entrada, todas as restrições (estado, u, Δu): ngk = 2·4 + 2 + 2, nvk = 2·4. chronos_cria confere. */
+#ifdef CHRONOS_FIXO
+#define NX_(c) 4
+#define NU_(c) 1
+#define NSE_(c) 5
+#define NGK_(c) 12
+#define NVK_(c) 8
+#else
+#define NX_(c) ((c)->nx)
+#define NU_(c) ((c)->nu)
+#define NSE_(c) ((c)->nse)
+#define NGK_(c) ((c)->ngk)
+#define NVK_(c) ((c)->nvk)
+#endif
+
 #define WQ(c, i, j, k) sqrt((c)->wq[(size_t)(k) * (c)->nx + (i)] * (c)->wq[(size_t)(k) * (c)->nx + (j)])
 #ifdef CHRONOS_PERFIL
 long long (*chronos_relogio)(void);
@@ -76,7 +93,7 @@ chronos_opcoes chronos_opcoes_padrao(void)
 
 static void get_mpc_variables(chronos *c, const real *s_prev, const real *u_prev)
 {
-    int nx = c->nx, nu = c->nu, N = c->N;
+    int nx = NX_(c), nu = NU_(c), N = c->N;
     (void)s_prev;
     for (int i = 0; i < nx; i++) c->s_ter[i] = M(c->s, i, N - 1, nx);
     for (int i = 0; i < nu; i++) c->du[i] = c->u[i] - u_prev[i];
@@ -93,7 +110,7 @@ static void get_mpc_variables(chronos *c, const real *s_prev, const real *u_prev
 
 static void update_mpc_f0_hess(chronos *c)
 {
-    int nx = c->nx, nu = c->nu, N = c->N, nse = c->nse;
+    int nx = NX_(c), nu = NU_(c), N = c->N, nse = NSE_(c);
     size_t pq = (size_t)nse * nse, pr = (size_t)nu * nu, py = (size_t)nu * nse;
     c->recompute_cost_hess = 0;
     memset(c->R_f0_0, 0, pr * sizeof(real));
@@ -129,7 +146,7 @@ static void update_mpc_f0_hess(chronos *c)
 
 static void grad_f0_MPC(chronos *c)
 {
-    int nx = c->nx, nu = c->nu, N = c->N, nse = c->nse;
+    int nx = NX_(c), nu = NU_(c), N = c->N, nse = NSE_(c);
     real t = c->op.t;
     memset(c->grad_u_f0_0, 0, nu * sizeof(real));
     memset(c->grad_se_f0_k, 0, (size_t)nse * (N - 1) * sizeof(real));
@@ -147,10 +164,12 @@ static void grad_f0_MPC(chronos *c)
             M(c->grad_u_f0_k, i, k, nu) += gdu;
         }
     /* grad_f0_tracking_wrapper.m: grad_s_E = C'Qe = Qe */
+    /* WQ·Qe já está no bloco de estados de Q_f0_k (update_mpc_f0_hess): sem as nx²·N raízes por iteração */
+    size_t pq = (size_t)nse * nse;
     for (int k = 0; k < N - 1; k++)
         for (int i = 0; i < nx; i++) {
             real ge = 0.0;
-            for (int j = 0; j < nx; j++) ge += WQ(c, i, j, k) * M(c->Qe, i, j, nx) * M(c->err, j, k, nx);
+            for (int j = 0; j < nx; j++) ge += c->Q_f0_k[k * pq + i + (size_t)j * nse] * M(c->err, j, k, nx);
             M(c->grad_se_f0_k, i, k, nse) -= ge;
         }
     for (int i = 0; i < nx; i++) {
@@ -177,7 +196,7 @@ static void grad_f0_MPC(chronos *c)
 
 static void equality_residuals(chronos *c)
 {
-    int nx = c->nx, nu = c->nu, N = c->N, nse = c->nse;
+    int nx = NX_(c), nu = NU_(c), N = c->N, nse = NSE_(c);
     size_t pa = (size_t)nx * nx, pb = (size_t)nx * nu;
     for (int i = 0; i < nx; i++) {
         real bu = 0.0;
@@ -204,7 +223,7 @@ static void equality_residuals(chronos *c)
 
 static void inequality_residuals(chronos *c)
 {
-    int nx = c->nx, nu = c->nu, N = c->N, ngk = c->ngk, nvk = c->nvk;
+    int nx = NX_(c), nu = NU_(c), N = c->N, ngk = NGK_(c), nvk = NVK_(c);
     for (int i = 0; i < c->ng0; i++) c->ri_0[i] = c->g_0[i];
     for (int k = 0; k < N - 1; k++) {
         for (int i = 0; i < ngk; i++) M(c->ri_k, i, k, ngk) = M(c->g_k, i, k, ngk);
@@ -243,7 +262,7 @@ static void inequality_residuals(chronos *c)
 
 static void reduced_KKT_elements(chronos *c)
 {
-    int nx = c->nx, nu = c->nu, N = c->N, nse = c->nse, ngk = c->ngk, nvk = c->nvk;
+    int nx = NX_(c), nu = NU_(c), N = c->N, nse = NSE_(c), ngk = NGK_(c), nvk = NVK_(c);
     size_t pq = (size_t)nse * nse, pr = (size_t)nu * nu, py = (size_t)nu * nse;
     real t = c->op.t;
 
@@ -376,7 +395,7 @@ static void resolve_sim(int n, const real *R, real *L, real *X, int nrhs)
 
 static void riccati_KKT_du(chronos *c)
 {
-    int nx = c->nx, nu = c->nu, N = c->N, nse = c->nse;
+    int nx = NX_(c), nu = NU_(c), N = c->N, nse = NSE_(c);
     size_t pq = (size_t)nse * nse, pr = (size_t)nu * nu, py = (size_t)nu * nse;
     size_t pa = (size_t)nx * nx, pb = (size_t)nx * nu;
     real *G = c->G_ric, *QA = c->QA_ric, *rhs = c->rhs;
@@ -534,7 +553,7 @@ static void riccati_KKT_du(chronos *c)
 
 static void recover_slacks(chronos *c)
 {
-    int nx = c->nx, nu = c->nu, N = c->N, nse = c->nse, ngk = c->ngk, nvk = c->nvk;
+    int nx = NX_(c), nu = NU_(c), N = c->N, nse = NSE_(c), ngk = NGK_(c), nvk = NVK_(c);
     if (c->rs.estado) {
         for (int k = 0; k < N - 1; k++)
             for (int i = 0; i < nx; i++) {
@@ -594,7 +613,7 @@ static void recover_slacks(chronos *c)
 
 static real get_lambda2(const chronos *c)
 {
-    int nu = c->nu, N = c->N, nse = c->nse, ngk = c->ngk, nvk = c->nvk;
+    int nu = NU_(c), N = c->N, nse = NSE_(c), ngk = NGK_(c), nvk = NVK_(c);
     real t = c->op.t, lambda2 = 0.0, a;
     a = 0.0;
     for (int i = 0; i < nu; i++) a += c->grad_u_f0_0[i] * c->delta_u[i];
@@ -648,7 +667,7 @@ static int todos_positivos(const real *x, const real *dx, size_t n, real l)
 
 static int line_search_local(chronos *c, int continue_Newton)
 {
-    int nx = c->nx, nu = c->nu, N = c->N, nse = c->nse;
+    int nx = NX_(c), nu = NU_(c), N = c->N, nse = NSE_(c);
     size_t n0 = c->ng0, nk = (size_t)c->ngk * (N - 1), nv = (size_t)c->nvk * (N - 1), nt = c->nter;
     real l = 1.0;
 #define FEAS(l) (todos_positivos(c->g_0, c->delta_g_0, n0, l) && todos_positivos(c->g_k, c->delta_g_k, nk, l) && \
@@ -679,7 +698,7 @@ static int line_search_local(chronos *c, int continue_Newton)
 
 int chronos_resolve(chronos *c, const real *s_prev, const real *u_prev, const real *ref, real *u0)
 {
-    int nx = c->nx, N = c->N;
+    int nx = NX_(c), N = c->N;
     /* r = ref(:,1:N-1); r_ter = ref(:,N); xN_ref = r_ter (xN_ref_is_y) */
     memcpy(c->r, ref, (size_t)nx * (N - 1) * sizeof(real));
     memcpy(c->r_ter, ref + (size_t)nx * (N - 1), nx * sizeof(real));
@@ -717,7 +736,7 @@ int chronos_resolve(chronos *c, const real *s_prev, const real *u_prev, const re
 
 static void inicializa_folgas(chronos *c)
 {
-    int N = c->N, ngk = c->ngk, nvk = c->nvk;
+    int N = c->N, ngk = NGK_(c), nvk = NVK_(c);
     real e = c->op.slack_epsilon;
     if (!(c->ng0 || c->ngk || c->nter)) return;
     memset(c->g_0, 0, c->ng0 * sizeof(real));
@@ -750,7 +769,7 @@ void chronos_reinicia_folgas(chronos *c, const real *s_prev, const real *u_prev)
 
 void chronos_inicializa(chronos *c, const real *s_prev, const real *u_prev)
 {
-    int nx = c->nx, nu = c->nu, N = c->N;
+    int nx = NX_(c), nu = NU_(c), N = c->N;
     size_t pa = (size_t)nx * nx, pb = (size_t)nx * nu;
     real e = c->op.slack_epsilon;
     real *x = zeros(nx), *xn = zeros(nx), *up = copia(u_prev, nu), *uk = zeros(nu);
@@ -817,6 +836,13 @@ chronos *chronos_cria(int nx, int nu, int N, chronos_opcoes op, chronos_restrico
     c->nter = rs.estado ? 2 * nx : 0;
     c->rt_smin = rs.estado ? 0 : -1;
     c->rt_smax = rs.estado ? nx : -1;
+#ifdef CHRONOS_FIXO
+    if (nx != NX_(c) || nu != NU_(c) || c->ngk != NGK_(c) || c->nvk != NVK_(c)) {   /* compilado para outro problema */
+        free(c->v_rows_k);
+        free(c);
+        return NULL;
+    }
+#endif
 
     /* dados */
     c->A = zeros((size_t)nx * nx * N); c->B = zeros((size_t)nx * nu * N);

@@ -38,6 +38,7 @@ typedef struct {
     int n_qp, n_it;        /* QPs do laço dos ρ e iterações de Newton somadas */
     real dP;             /* ‖T(P) - P‖∞ do último QP */
     int convergiu, finito;
+    int cortado;           /* 1: o laço dos ρ parou pelo orçamento de tempo */
 } mpc_info;
 
 typedef struct mpc mpc;
@@ -53,5 +54,8 @@ const real *mpc_U(const mpc *c);
 const real *mpc_S(const mpc *c);
 /* Matriz terminal usada (4×4, coluna; zeros sem terminal). */
 const real *mpc_P_terminal(const mpc *c);
+/* Orçamento de tempo por passo (embarcado): depois de cada QP, só faz outro se o tempo gasto mais o do último
+ * QP couber em orcamento_us. relogio_us: relógio em µs; NULL desliga. */
+void mpc_orcamento(mpc *c, long long (*relogio_us)(void), long long orcamento_us);
 
 #endif

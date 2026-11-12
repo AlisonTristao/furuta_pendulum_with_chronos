@@ -58,7 +58,8 @@ void modelo_passo(const modelo *m, double x[4], double u, int nsub)
 static void ode_acel(const modelo *m, const double x[4], double a, double dx[4])
 {
     double s = sin(x[1]), c = cos(x[1]), d1 = x[2], d2 = x[3];
-    double r2 = -m->mu2 * d2 + 0.5 * m->beta * d1 * d1 * sin(2 * x[1]) + m->eta * s - m->tc2 * tanh(d2 / 0.01);
+    double r2 = -m->mu2 * d2 + 0.5 * m->beta * d1 * d1 * sin(2 * x[1]) + m->eta * s;
+    if (m->tc2 != 0) r2 -= m->tc2 * tanh(d2 / 0.01);   /* atrito seco: só na planta simulada */
     dx[0] = d1;
     dx[1] = d2;
     dx[2] = a;
@@ -78,6 +79,42 @@ void modelo_passo_acel(const modelo *m, double x[4], double a, double h0, int ns
         ode_acel(m, t, a, k4);
         for (int i = 0; i < 4; i++) x[i] += h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
     }
+}
+
+/* Estimador e compensação do atraso no tipo do controlador (real.h): no ESP32 em float (o double emulado com
+ * sin/cos levava ~2,7 ms por período). Sem atrito seco (o controlador não modela). No PC, real = double: chama
+ * a versão em double (mesmo resultado bit a bit). */
+#ifdef REAL_FLOAT
+static void ode_acel_r(const modelo *m, const real x[4], real a, real dx[4])
+{
+    real s = sin(x[1]), c = cos(x[1]), d1 = x[2], d2 = x[3];
+    real r2 = -(real)m->mu2 * d2 + (real)0.5 * (real)m->beta * d1 * d1 * sin(2 * x[1]) + (real)m->eta * s;
+    dx[0] = d1;
+    dx[1] = d2;
+    dx[2] = a;
+    dx[3] = (r2 - (real)m->gamma * c * a) / (real)m->delta;
+}
+#endif
+
+void modelo_passo_acel_ctl(const modelo *m, double xd[4], double ad, double h0, int nsub)
+{
+#ifdef REAL_FLOAT
+    real x[4] = {(real)xd[0], (real)xd[1], (real)xd[2], (real)xd[3]}, a = (real)ad;
+    real h = (real)h0 / nsub, k1[4], k2[4], k3[4], k4[4], t[4];
+    for (int n = 0; n < nsub; n++) {
+        ode_acel_r(m, x, a, k1);
+        for (int i = 0; i < 4; i++) t[i] = x[i] + h / 2 * k1[i];
+        ode_acel_r(m, t, a, k2);
+        for (int i = 0; i < 4; i++) t[i] = x[i] + h / 2 * k2[i];
+        ode_acel_r(m, t, a, k3);
+        for (int i = 0; i < 4; i++) t[i] = x[i] + h * k3[i];
+        ode_acel_r(m, t, a, k4);
+        for (int i = 0; i < 4; i++) x[i] += h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+    }
+    for (int i = 0; i < 4; i++) xd[i] = x[i];
+#else
+    modelo_passo_acel(m, xd, ad, h0, nsub);
+#endif
 }
 
 /* Daqui para baixo: ρ e ZOH, chamados a cada estágio de cada QP do MPC, no tipo do controlador (real.h). */
@@ -150,12 +187,25 @@ static void expm5(const real *M, real *E)
     real esc = ldexp((real)1, -s);
     for (int i = 0; i < 25; i++) A[i] = M[i] * esc;
     for (int i = 0; i < 25; i++) E[i] = T[i] = (i % 6 == 0);
-    for (int k = 1; k < 16; k++) {
+#ifdef REAL_FLOAT
+    const int ordem = 7;   /* ‖A‖ <= 1/8: resto ~ 0,125^8/8! ~ 6e-13, muito abaixo do épsilon do float */
+#else
+    const int ordem = 15;  /* igual ao código de referência */
+#endif
+    for (int k = 1; k <= ordem; k++) {
         mat5_mul(T, A, T);
+#ifdef REAL_FLOAT
+        real ik = (real)1 / k;   /* divisão em float é cara no ESP32: 1 por termo em vez de 25 */
+        for (int i = 0; i < 25; i++) {
+            T[i] *= ik;
+            E[i] += T[i];
+        }
+#else
         for (int i = 0; i < 25; i++) {
             T[i] /= k;
             E[i] += T[i];
         }
+#endif
     }
     for (int n = 0; n < s; n++) mat5_mul(E, E, E);
 }

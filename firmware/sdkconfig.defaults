@@ -10,3 +10,9 @@ CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
 
 # ISR do gerador de passos em IRAM
 CONFIG_GPTIMER_ISR_HANDLER_IN_IRAM=y
+
+# -O2 no firmware (o MPC tem -O3 próprio, components/mpc)
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# Núcleo 1 dedicado ao MPC (embarcado.c): o IDLE dele pode ficar sem rodar
+# CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1 is not set

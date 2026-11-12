@@ -15,6 +15,8 @@ struct mpc {
     real *A, *B, *ref;    /* 4×4×N, 4×N, 4×N */
     real *h, *T;            /* duração do estágio k e instante do fim do estágio k (N); NULL = uniforme */
     real Pterm[16];
+    long long (*relogio)(void);   /* orçamento de tempo do laço dos ρ (mpc_orcamento); NULL = sem limite */
+    long long orcamento_us;
 };
 
 mpc_config mpc_config_artigo(void)
@@ -182,6 +184,10 @@ mpc *mpc_cria(const mpc_config *cfg, const modelo *m, const double x0d[4], doubl
     chronos_restricoes rs = {1, 1, 1};
     c->ch = chronos_cria(4, 1, N, cfg->op, rs, Qe, &cfg->Rdu, cfg->terminal_dlqr ? c->Pterm : NULL, smin, smax, qv,
                          qv, &cfg->u_min, &cfg->u_max, &cfg->du_min, &cfg->du_max);
+    if (!c->ch) {                                 /* CHRONOS_FIXO compilado para outros tamanhos */
+        mpc_libera(c);
+        return NULL;
+    }
 
     if (cfg->peso_exp != 0 || c->h) {             /* exponencial: longe da referência no começo, perto no fim */
         real *w = (real *)malloc(4 * N * sizeof(real));
@@ -235,8 +241,9 @@ double mpc_passo(mpc *c, const double xd[4], const double refd[4], mpc_info *inf
         rho_trajetoria(c, x, c->S, c->P);
     for (int k = 0; k < N; k++) memcpy(c->ref + 4 * k, ref, 4 * sizeof(real));
 
-    mpc_info in = {0, 0, INFINITY, 0, 1};
+    mpc_info in = {0, 0, INFINITY, 0, 1, 0};
     real *cu = chronos_u(c->ch), *csu = chronos_su(c->ch), *cs = chronos_s(c->ch);
+    long long t_ini = c->relogio ? c->relogio() : 0, t_qp = t_ini;
     for (;;) {
         CHRONOS_T(9, dinamica(c, c->P));
         chronos_dinamica(c->ch, c->A, c->B);
@@ -260,6 +267,14 @@ double mpc_passo(mpc *c, const double xd[4], const double refd[4], mpc_info *inf
         for (int i = 0; i < 8 * N; i++) dP = fmax(dP, fabs(c->Pn[i] - c->P[i]));
         in.dP = dP;
         if (dP < c->cfg.eps_rho || in.n_qp >= c->cfg.l_max) break;
+        if (c->relogio) {                              /* orçamento: só faz outro QP se couber (estimado pelo último) */
+            long long agora = c->relogio();
+            if (agora - t_ini + (agora - t_qp) > c->orcamento_us) {
+                in.cortado = 1;
+                break;
+            }
+            t_qp = agora;
+        }
         real *t = c->P;                              /* Picard: P <- T(P) */
         c->P = c->Pn;
         c->Pn = t;
@@ -275,3 +290,9 @@ double mpc_passo(mpc *c, const double xd[4], const double refd[4], mpc_info *inf
 const real *mpc_U(const mpc *c) { return c->U; }
 const real *mpc_S(const mpc *c) { return c->S; }
 const real *mpc_P_terminal(const mpc *c) { return c->Pterm; }
+
+void mpc_orcamento(mpc *c, long long (*relogio_us)(void), long long orcamento_us)
+{
+    c->relogio = relogio_us;
+    c->orcamento_us = orcamento_us;
+}

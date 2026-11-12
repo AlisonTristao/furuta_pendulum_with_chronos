@@ -28,6 +28,12 @@ static volatile bool s_ped_homing, s_ped_origem, s_ped_zera;
 static volatile int s_ped_hab = -1;
 static volatile bool s_pronto_init = false;
 
+// amostra para o controle embarcado: a cada s_amostra_ms a malha copia a leitura e acorda a tarefa assinante
+static TaskHandle_t volatile s_assinante = NULL;
+static volatile int s_amostra_ms = 20;
+static leitura_t s_amostra;
+static int s_cont_amostra = 0;
+
 // ------------------------------------------------------------- estado da malha (só núcleo 1)
 static float s_v = 0.0f;               // velocidade comandada do braço (rad/s)
 static int64_t s_t_pronto = 0;         // última vez que a malha não estava em PRONTO (us)
@@ -213,12 +219,38 @@ static void tarefa(void *arg)
         taskENTER_CRITICAL(&s_mux);
         s_leitura = x;
         taskEXIT_CRITICAL(&s_mux);
+
+        TaskHandle_t ass = s_assinante;
+        if (ass && ++s_cont_amostra >= s_amostra_ms) {
+            s_cont_amostra = 0;
+            taskENTER_CRITICAL(&s_mux);
+            s_amostra = x;
+            taskEXIT_CRITICAL(&s_mux);
+            xTaskNotifyGive(ass);
+        }
     }
+}
+
+void controle_assina_amostra(TaskHandle_t tarefa, int periodo_ms)
+{
+    s_assinante = NULL;
+    s_amostra_ms = periodo_ms > 0 ? periodo_ms : 20;
+    s_cont_amostra = 0;
+    s_assinante = tarefa;
+}
+
+void controle_amostra(leitura_t *x)
+{
+    taskENTER_CRITICAL(&s_mux);
+    *x = s_amostra;
+    taskEXIT_CRITICAL(&s_mux);
 }
 
 void controle_init(void)
 {
-    xTaskCreatePinnedToCore(tarefa, "controle", 4096, NULL, configMAX_PRIORITIES - 2, NULL, 1);
+    // núcleo 0: a malha e a ISR do gerador de passos (criada em stepper_init, dentro da tarefa) ficam longe do
+    // MPC, que tem o núcleo 1 só para ele (embarcado.c)
+    xTaskCreatePinnedToCore(tarefa, "controle", 4096, NULL, configMAX_PRIORITIES - 2, NULL, 0);
     while (!s_pronto_init) vTaskDelay(1);
 }
 

@@ -26,6 +26,8 @@ double modelo_acel_braco(const modelo *m, const double x[4], double u);
 void modelo_passo(const modelo *m, double x[4], double u, int nsub);
 /* Planta como no hardware: o motor impõe θ̈1 = a (constante) e o pêndulo responde. RK4 com nsub subpassos em h. */
 void modelo_passo_acel(const modelo *m, double x[4], double a, double h, int nsub);
+/* Idem para o controlador (estimador, compensação do atraso): contas no tipo real (float no ESP32), sem atrito seco. */
+void modelo_passo_acel_ctl(const modelo *m, double x[4], double a, double h, int nsub);
 
 /* ρ e ZOH no tipo do controlador (real.h); o resto em double (planta simulada, estimador, compensação de atraso).
  * ρ = f_ρ(x) (8, eq. 12), na escala de Ts (ρ·Ts), com dθ saturadas em ±vmax. */

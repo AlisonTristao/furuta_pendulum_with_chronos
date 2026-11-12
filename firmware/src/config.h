@@ -19,7 +19,7 @@
 
 // ---------------------------------------------------------------- serial
 #define SERIAL_BAUD      921600
-#define SERIAL_LINHA_MAX 64
+#define SERIAL_LINHA_MAX 160
 
 // ---------------------------------------------------------------- motor
 #define MOTOR_PASSOS_VOLTA 200      // passos inteiros por volta

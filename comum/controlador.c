@@ -30,7 +30,7 @@ double controlador_passo(controlador *k, double x[4], double t, mpc_info *in)
     x[1] -= k->off2;
     if (e->estimador) estimador_passo(&k->est, &k->m, x, k->a_int, e->Ts);   /* x[3] passa a ser o estimado */
     double xc[4] = {x[0], x[1], x[2], x[3]};
-    if (e->comp_atraso_ms > 0) modelo_passo_acel(&k->m, xc, k->a_ap, e->comp_atraso_ms * 1e-3, 4);
+    if (e->comp_atraso_ms > 0) modelo_passo_acel_ctl(&k->m, xc, k->a_ap, e->comp_atraso_ms * 1e-3, 4);
     double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
     double u = mpc_passo(k->c, xc, ref, in);
     double a = in->finito ? modelo_acel_braco(&k->m, xc, u) : 0.0;

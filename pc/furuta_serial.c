@@ -53,7 +53,7 @@ static int classifica(const char *r)
 
 int furuta_comando(furuta *f, const char *cmd, char *resp, int cap, int timeout_ms)
 {
-    char linha[64];
+    char linha[200];
     int n = snprintf(linha, sizeof(linha), "%s\n", cmd);
     if (serial_escreve(f->s, linha, n)) return FURUTA_PRAZO;
     if (serial_le_linha(f->s, f->resp, sizeof(f->resp), timeout_ms) < 0) {
@@ -84,3 +84,15 @@ int furuta_estado(furuta *f, double x[4], int timeout_ms)
 }
 
 void furuta_limpa(furuta *f) { serial_limpa(f->s); }
+
+int furuta_envia(furuta *f, const char *cmd)
+{
+    char linha[200];
+    int n = snprintf(linha, sizeof(linha), "%s\n", cmd);
+    return serial_escreve(f->s, linha, n) ? FURUTA_PRAZO : FURUTA_OK;
+}
+
+int furuta_linha(furuta *f, char *linha, int cap, int timeout_ms)
+{
+    return serial_le_linha(f->s, linha, cap, timeout_ms) < 0 ? FURUTA_PRAZO : classifica(linha);
+}

@@ -8,8 +8,15 @@
 //   S     estado                          -> "S,<estado>,<erro>,<encoder>,<fim_neg>,<fim_pos>,<flt>"
 //   I     scan I2C                        -> "I,<0xAA>,..."
 //   E0/E1 desliga/liga o driver           -> "OK"
+//   P<secao.chave=valor> configuração do controle embarcado (chaves do pc/furuta.ini) -> "OK" | "ERR,PAR"
+//   M1    liga o controle embarcado (após o homing) -> "OK" | "ERR,<motivo>"; depois, sozinho:
+//         "M,ESPERA" (esperando a condição de partida), "M,LIGADO,<amostras perdidas na criação>",
+//         "T,t,t1,t2,dt1,dt2,u,a,n_qp,n_it,t_calc_ms,estouros" a cada período, "M,FIM,<estouros>,<motivo>"
+//   M2    idem a seco (calcula com os sensores, sem comandar o motor; sem homing nem espera)
+//   M0    desliga o controle embarcado -> "OK" (e depois "M,FIM,...")
 #include "config.h"
 #include "controle.h"
+#include "embarcado.h"
 #include "encoder.h"
 #include "protocolo.h"
 
@@ -25,9 +32,11 @@
 
 #define UART UART_NUM_0
 
-static void envia(const char *fmt, ...)
+#define envia protocolo_envia
+
+void protocolo_envia(const char *fmt, ...)
 {
-    char buf[128];
+    char buf[160];
     va_list ap;
     va_start(ap, fmt);
     int n = vsnprintf(buf, sizeof(buf) - 1, fmt, ap);
@@ -100,7 +109,26 @@ static void executa(char *linha)
         envia("%s", buf);
         break;
     }
+    case 'P':                                // P<secao.chave=valor>: configuração do controle embarcado
+        if (embarcado_config(linha + 1)) envia("OK");
+        else envia(embarcado_ativo() ? "ERR,ATIVO" : "ERR,PAR");
+        break;
+    case 'M': {                              // M1 controle, M2 a seco, M0 desliga
+        if (linha[1] == '0') {
+            embarcado_desliga();
+            envia("OK");
+            break;
+        }
+        const char *erro = embarcado_liga(linha[1] - '0');
+        if (erro) envia("ERR,%s", erro);
+        else envia("OK");
+        break;
+    }
     case 'E':
+        if (embarcado_ativo()) {             // não desliga o driver no meio do controle embarcado
+            envia("ERR,ATIVO");
+            break;
+        }
         if (linha[1] == '0' || linha[1] == '1') {
             controle_habilita(linha[1] == '1');
             envia("OK");
@@ -153,7 +181,7 @@ void protocolo_init(void)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
-    uart_driver_install(UART, 1024, 1024, 0, NULL, 0);
+    uart_driver_install(UART, 1024, 4096, 0, NULL, 0);   // TX maior: telemetria do controle embarcado
     uart_param_config(UART, &cfg);
     uart_set_pin(UART, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     xTaskCreatePinnedToCore(tarefa, "protocolo", 4096, NULL, 5, NULL, 0);

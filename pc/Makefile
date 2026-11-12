@@ -26,7 +26,7 @@ ident.exe: ident.c furuta_serial.c serial.c $(NUCLEO) $(HDRS)
 OBJF = $(patsubst ../comum/%.c,obj_f/%.o,$(COMUM))
 obj_f/%.o: ../comum/%.c $(HDRS)
 	@mkdir -p obj_f
-	$(CC) $(CFLAGS) -DREAL_FLOAT -Werror=double-promotion -c -o $@ $<
+	$(CC) $(CFLAGS) -DREAL_FLOAT -DCHRONOS_FIXO -Werror=double-promotion -c -o $@ $<
 
 sim_f.exe: sim.c periodo.c $(OBJF) $(HDRS)
 	$(CC) $(CFLAGS) -DREAL_FLOAT -o $@ sim.c periodo.c $(OBJF) $(LDLIBS)

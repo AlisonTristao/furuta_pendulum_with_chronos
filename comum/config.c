@@ -175,21 +175,22 @@ int config_le(const char *arquivo, config *c)
     return erros ? -1 : 0;
 }
 
-int config_arg(config *c, const char *arg)
+int config_arg_silencioso(config *c, const char *arg)
 {
     char b[160];
     snprintf(b, sizeof(b), "%s", arg);
     char *ig = strchr(b, '='), *pt = strchr(b, '.');
-    if (!ig || !pt || pt > ig) {
-        fprintf(stderr, "argumento inválido: %s (use secao.chave=valor)\n", arg);
-        return -1;
-    }
+    if (!ig || !pt || pt > ig) return -2;
     *ig = *pt = '\0';
-    if (aplica(c, apara(b), apara(pt + 1), apara(ig + 1))) {
-        fprintf(stderr, "chave desconhecida ou valor inválido: %s\n", arg);
-        return -1;
-    }
-    return 0;
+    return aplica(c, apara(b), apara(pt + 1), apara(ig + 1)) ? -1 : 0;
+}
+
+int config_arg(config *c, const char *arg)
+{
+    int r = config_arg_silencioso(c, arg);
+    if (r == -2) fprintf(stderr, "argumento inválido: %s (use secao.chave=valor)\n", arg);
+    else if (r) fprintf(stderr, "chave desconhecida ou valor inválido: %s\n", arg);
+    return r ? -1 : 0;
 }
 
 int config_le_args(int argc, char **argv, config *c, const char **livre)

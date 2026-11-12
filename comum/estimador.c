@@ -12,7 +12,7 @@ void estimador_passo(estimador *e, const modelo *m, double x[4], double a_ant, d
         e->iniciado = 1;
         return;
     }
-    modelo_passo_acel(m, e->x, a_ant, Ts, 10);
+    modelo_passo_acel_ctl(m, e->x, a_ant, Ts, 10);
     double inov = x[1] - e->x[1];
     e->x[0] = x[0], e->x[2] = x[2];               /* braço: o firmware sabe exatamente (passos) */
     e->x[1] += e->L1 * inov;

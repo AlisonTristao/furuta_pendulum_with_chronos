@@ -41,6 +41,11 @@ int furuta_comando(furuta *f, const char *cmd, char *resp, int cap, int timeout_
 
 const char *furuta_ultima_resposta(const furuta *f);
 
+/* Controle embarcado: manda um comando sem esperar resposta; lê uma linha qualquer (telemetria "T,...",
+ * avisos "M,..."). furuta_linha devolve FURUTA_OK, FURUTA_ERR, FURUTA_REINICIOU ou FURUTA_PRAZO. */
+int furuta_envia(furuta *f, const char *cmd);
+int furuta_linha(furuta *f, char *linha, int cap, int timeout_ms);
+
 /* "t1,t2,dt1,dt2" -> x; 0 se o formato estiver certo. */
 int furuta_le_estado(const char *linha, double x[4]);
 
