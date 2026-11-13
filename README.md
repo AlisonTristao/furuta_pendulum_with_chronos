@@ -197,7 +197,7 @@ de a USB passar para o BTP.
 
 Sequência típica: `furuta -home`, depois `furuta -dry` para conferir os sinais, depois `furuta -start`.
 
-**Tópicos** para plotar (cada campo declara a faixa do eixo: θ1 ±1,8 rad, θ2 ±π, dθ1 ±25 rad/s, dθ2 ±40 rad/s, u ±1, a ±300 rad/s², t_calc 0-20 ms):
+**Tópicos** para plotar (cada campo declara a faixa do eixo: os limites do sistema com 20% de folga, ex. θ1 ±2,16 rad, θ2 ±3,77 rad, a ±360 rad/s²):
 
 | Tópico | Taxa | Campos |
 |---|---|---|

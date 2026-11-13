@@ -40,12 +40,14 @@ namespace {
 
 constexpr float kPi = 3.14159265358979f;
 
-// Faixas dos eixos no TraceView (.f32(nome, unidade, min, max)): os limites do sistema
-constexpr double kTheta1 = 1.8;    // curso do braço: meio curso medido 1,71 rad
-constexpr double kVel = 25;        // V_MAX da malha (dθ1) [rad/s]
-constexpr double kVel2 = 40;       // ensaio.dtheta2_aborta [rad/s]
-constexpr double kU = 1;           // torque virtual: mpc.u_max padrão 0,75 [N·m]
-constexpr double kAcel = 300;      // A_MAX da malha [rad/s²]
+// Faixas dos eixos no TraceView (.f32(nome, unidade, min, max)): os limites do sistema com 20% de folga
+constexpr double kFolga = 1.2;
+constexpr double kTheta1 = 1.8 * kFolga;    // curso do braço: meio curso medido 1,71 rad
+constexpr double kVel = 25 * kFolga;     // V_MAX da malha (dθ1) [rad/s]
+constexpr double kVel2 = 40 * kFolga;    // ensaio.dtheta2_aborta [rad/s]
+constexpr double kU = 1 * kFolga;        // torque virtual: mpc.u_max padrão 0,75 [N·m]
+constexpr double kAcel = 300 * kFolga;   // A_MAX da malha [rad/s²]
+constexpr double kAng = kPi * kFolga;    // θ2 em [-π, π)
 
 float wrap(float a) { return a - 2.0f * kPi * std::floor((a + kPi) / (2.0f * kPi)); }
 
@@ -121,16 +123,16 @@ public:
         controle_ = t.topic("controle", btpdev::OnEvent)
                         .f32("t", "s")
                         .f32("theta1", "rad", -kTheta1, kTheta1)
-                        .f32("theta2", "rad", -kPi, kPi)   // em [-π, π): 0 = topo
+                        .f32("theta2", "rad", -kAng, kAng)   // em [-π, π): 0 = topo
                         .f32("dtheta1", "rad/s", -kVel, kVel)
                         .f32("dtheta2", "rad/s", -kVel2, kVel2)
                         .f32("u", "N·m", -kU, kU)
                         .f32("a", "rad/s²", -kAcel, kAcel)
                         .u8("n_qp")
-                        .range(0, 10)
+                        .range(0, 10 * kFolga)
                         .u8("n_it")
-                        .range(0, 100)
-                        .f32("t_calc", "ms", 0, 20)
+                        .range(0, 100 * kFolga)
+                        .f32("t_calc", "ms", 0, 20 * kFolga)
                         .u16("estouros")
                         .fill([this](btpdev::Sample& s) {
                             telemetria_t tl;
@@ -152,7 +154,7 @@ public:
         t.topic("sensores", btpdev::Hz(50))
             .f32("theta1", "rad", -kTheta1, kTheta1)
             .f32("theta2", "rad")                        // contínuo, sem faixa (acumula voltas)
-            .f32("theta2_topo", "rad", -kPi, kPi)        // θ2 em [-π, π): 0 = topo
+            .f32("theta2_topo", "rad", -kAng, kAng)        // θ2 em [-π, π): 0 = topo
             .f32("dtheta1", "rad/s", -kVel, kVel)
             .f32("dtheta2", "rad/s", -kVel2, kVel2)
             .fill([](btpdev::Sample& s) {
