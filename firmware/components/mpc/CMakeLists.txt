@@ -3,7 +3,7 @@
 # (padrão -O3, 13% mais rápido que -O2 no bench; faça pio run -t clean antes de trocar).
 set(COMUM ${CMAKE_CURRENT_LIST_DIR}/../../../comum)
 idf_component_register(SRCS ${COMUM}/chronos.c ${COMUM}/qlpv_mpc.c ${COMUM}/modelo.c ${COMUM}/estimador.c
-                            ${COMUM}/config.c ${COMUM}/controlador.c
+                            ${COMUM}/config.c ${COMUM}/controlador.c ${COMUM}/planta.c
                        INCLUDE_DIRS ${COMUM}
                        LDFRAGMENTS linker.lf)   # tudo na RAM (linker.lf)
 target_compile_definitions(${COMPONENT_LIB} PUBLIC REAL_FLOAT CHRONOS_FIXO)   # FIXO: tamanhos constantes (chronos.c)

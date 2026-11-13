@@ -4,6 +4,7 @@
 // Terminal (help lista tudo):
 //   furuta -home | -origem | -zera | -driver <0|1> | -status   malha interna (controle.c)
 //   furuta -start | -dry | -stop | -bench                      ensaio (embarcado.c): controle, a seco, para, benchmark
+//   furuta -sim                                                ensaio simulado em tempo real, com telemetria (sem motor)
 //   furuta -ident <l2>                                         oscilação livre -> I2, mu2 (ident.c; era o ident.exe)
 //   cfg -set <secao.chave=valor> | -show | -reset             configuração (chaves do pc/furuta.ini; listas com
 //                                                              espaço: cfg -set mpc.Q=10 100 5 1)
@@ -73,6 +74,8 @@ public:
                 return uint8_t{RESULT_OK};
             }, "furuta -stop: para o ensaio")
             .add("bench", [] { return liga(3); }, "furuta -bench: tempo do MPC com a config em uso (planta simulada)")
+            .add("sim", [] { return liga(4); },
+                 "furuta -sim: ensaio simulado em tempo real (planta da seção [sim]), com telemetria; sem motor")
             .add("gravar", [] {
                 if (embarcado_ativo()) return err("tem um ensaio rodando");
                 btpdev::printf("reiniciando no modo de gravação: feche a porta e rode pio run -t upload\n");
@@ -145,7 +148,12 @@ public:
             .f32("dtheta2", "rad/s")
             .fill([](btpdev::Sample& s) {
                 leitura_t x;
-                controle_leitura(&x);
+                float xs[4];
+                if (embarcado_sim_leitura(xs)) {   // furuta -sim: o que a planta simulada mede
+                    x.t1 = xs[0], x.t2 = xs[1], x.dt1 = xs[2], x.dt2 = xs[3];
+                } else {
+                    controle_leitura(&x);
+                }
                 s.put("theta1", x.t1)
                     .put("theta2", x.t2)
                     .put("theta2_topo", wrap(x.t2))
@@ -222,7 +230,9 @@ private:
         const char* e = embarcado_liga(modo);
         if (e) return err(e);
         btpdev::printf("%s\n", modo == 1 ? "controle ligado: esperando a condição de partida"
-                               : modo == 2 ? "a seco ligado" : "bench rodando no núcleo 1");
+                               : modo == 2 ? "a seco ligado"
+                               : modo == 3 ? "bench rodando no núcleo 1"
+                                           : "simulação ligada (furuta -stop para)");
         return RESULT_OK;
     }
 

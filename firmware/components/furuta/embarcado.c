@@ -2,6 +2,7 @@
 
 #include "controlador.h"
 #include "controle.h"
+#include "planta.h"
 #include "saida.h"
 
 #include <math.h>
@@ -22,7 +23,7 @@ void bench_roda(const config *cfg);           // bench.c
 static config s_cfg;                        // configuração em uso (cfg -set), copiada no início do ensaio
 static TaskHandle_t s_tarefa_mpc;
 static QueueHandle_t s_fila_tel;
-static volatile int s_pedido = 0;           // 0 = nada, 1 = controle, 2 = a seco, 3 = bench, -1 = desliga
+static volatile int s_pedido = 0;           // 0 = nada, 1 = controle, 2 = a seco, 3 = bench, 4 = sim, -1 = desliga
 static volatile bool s_ativo = false;
 static volatile fase_t s_fase = FASE_PARADO;
 static controlador s_ctl;
@@ -68,7 +69,7 @@ fase_t embarcado_fase(void) { return s_fase; }
 
 const char *embarcado_fase_nome(fase_t f)
 {
-    static const char *nomes[] = {"PARADO", "ESPERA", "RODANDO", "SECO", "BENCH"};
+    static const char *nomes[] = {"PARADO", "ESPERA", "RODANDO", "SECO", "BENCH", "SIM"};
     return nomes[f];
 }
 
@@ -76,7 +77,7 @@ const char *embarcado_liga(int modo)
 {
     if (s_ativo) return "já tem um ensaio rodando";
     if (modo == 1 && controle_estado() != EST_PRONTO) return "faça o homing antes (furuta -home)";
-    if (modo < 1 || modo > 3) return "modo inválido";
+    if (modo < 1 || modo > 4) return "modo inválido";
     s_pedido = modo;
     xTaskNotifyGive(s_tarefa_mpc);
     return NULL;
@@ -202,17 +203,112 @@ static const char *roda_ensaio(int modo)
     return motivo;
 }
 
+// Simulação em tempo real (modo 4, furuta -sim): o mesmo controlador do ensaio, com o orçamento de tempo, contra a
+// planta calibrada do sim.exe (comum/planta.c, seção [sim]), um passo a cada Ts. Publica a telemetria como um
+// ensaio, e o tópico sensores mostra o que a planta simulada mede. Não mexe no motor.
+static portMUX_TYPE s_mux_sim = portMUX_INITIALIZER_UNLOCKED;
+static float s_sim_x[4];
+static volatile bool s_sim_ativo = false;
+
+bool embarcado_sim_leitura(float x[4])
+{
+    if (!s_sim_ativo) return false;
+    taskENTER_CRITICAL(&s_mux_sim);
+    for (int i = 0; i < 4; i++) x[i] = s_sim_x[i];
+    taskEXIT_CRITICAL(&s_mux_sim);
+    return true;
+}
+
+static void sim_publica(const double xm[4])
+{
+    taskENTER_CRITICAL(&s_mux_sim);
+    for (int i = 0; i < 4; i++) s_sim_x[i] = (float)xm[i];
+    taskEXIT_CRITICAL(&s_mux_sim);
+}
+
+#define SIM_PLANTA_US 3000   /* reserva do período para a planta (double emulado no S3) */
+
+static void roda_sim(void)
+{
+    static planta p;              // 2,5 KB: fora da pilha
+    config cfg = s_cfg;
+    const ensaio *e = &cfg.e;
+    planta_cria(&p, &cfg);
+    sim_publica(p.xm);
+    s_sim_ativo = true;
+    if (controlador_cria(&s_ctl, &cfg, p.x) != 0) {
+        s_sim_ativo = false;
+        saida_aviso("sim: falha ao criar o MPC");
+        return;
+    }
+    int ts_ms = (int)lround(e->Ts * 1e3);
+    mpc_orcamento(s_ctl.c, relogio_us, ts_ms * 1000LL - FOLGA_US - SIM_PLANTA_US);
+    char txt[400];
+    resumo(&cfg, txt, sizeof(txt));
+    saida_aviso("sim ligado: planta simulada (seção [sim]: atrito seco %g, encoder %d bits, semente %d), %.0f s\n%s",
+                e->tc2, e->bits_enc, e->semente, e->duracao, txt);
+
+    int K = (int)lround(e->duracao / e->Ts), k, topo = 0;
+    unsigned estouros = 0;
+    double t_sobe = -1, calc_soma = 0, calc_max = 0, planta_soma = 0, planta_max = 0;
+    const char *motivo = "fim da duração";
+    TickType_t t_ini = xTaskGetTickCount();
+    for (k = 0; k < K; k++) {
+        if (s_pedido == -1) {
+            motivo = "desligado (furuta -stop)";
+            break;
+        }
+        double xm[4] = {p.xm[0], p.xm[1], p.xm[2], p.xm[3]};   // o controlador troca dθ2 pelo estimado
+        int64_t t0 = esp_timer_get_time();
+        mpc_info in;
+        double a = controlador_passo(&s_ctl, xm, k * e->Ts, &in);
+        int64_t t1 = esp_timer_get_time();
+        planta_passo(&p, a);                      // o comando de k entra em k+1 (ensaio.embarcado)
+        int64_t t2 = esp_timer_get_time();
+        sim_publica(p.xm);
+        float t_calc = (t1 - t0) * 1e-3f;
+        calc_soma += t_calc, calc_max = fmax(calc_max, t_calc);
+        planta_soma += (t2 - t1) * 1e-3, planta_max = fmax(planta_max, (t2 - t1) * 1e-3);
+        telemetria_t tl = {(float)(k * e->Ts), {(float)xm[0], (float)xm[1], (float)xm[2], (float)xm[3]},
+                           (float)s_ctl.u, (float)a, t_calc, (unsigned char)in.n_qp, (unsigned char)in.n_it,
+                           (unsigned short)(estouros > 65535 ? 65535 : estouros)};
+        xQueueSend(s_fila_tel, &tl, 0);
+        double th = wrap(p.x[1]);
+        if (fabs(th) < 0.35) topo++;
+        if (t_sobe < 0 && fabs(th) < 0.1 && fabs(p.x[3]) < 0.5) t_sobe = k * e->Ts;
+        if (!in.finito) {
+            motivo = "controle não finito";
+            break;
+        }
+        if (fabs(p.x[3]) > e->theta2_aborta) {
+            motivo = "|dθ2| acima de dtheta2_aborta";
+            break;
+        }
+        if (xTaskDelayUntil(&t_ini, pdMS_TO_TICKS(ts_ms)) == pdFALSE) estouros++;   // já tinha passado do período
+    }
+    s_sim_ativo = false;
+    controlador_libera(&s_ctl);
+    int n = k > 0 ? k : 1;
+    saida_aviso("fim da sim: %s (%.1f s) | subida %.2f s | topo %d%% | MPC médio %.2f ms, máx %.2f | planta médio "
+                "%.2f ms, máx %.2f | %u estouros",
+                motivo, k * e->Ts, t_sobe, 100 * topo / n, calc_soma / n, calc_max, planta_soma / n, planta_max,
+                estouros);
+}
+
 static void tarefa_mpc(void *arg)
 {
     for (;;) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         int modo = s_pedido;
-        if (modo < 1 || modo > 3) continue;
+        if (modo < 1 || modo > 4) continue;
         s_ativo = true;
         if (modo == 3) {
             s_fase = FASE_BENCH;
             config cfg = s_cfg;
             bench_roda(&cfg);
+        } else if (modo == 4) {
+            s_fase = FASE_SIM;
+            roda_sim();
         } else {
             roda_ensaio(modo);
         }

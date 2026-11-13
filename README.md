@@ -187,6 +187,7 @@ de a USB passar para o BTP.
 | `furuta -start` | ensaio com controle: impulso inicial, swing-up e equilíbrio |
 | `furuta -dry` | a seco: calcula o controle com os sensores, sem mover o motor |
 | `furuta -stop` | para o ensaio |
+| `furuta -sim` | ensaio simulado em tempo real, com telemetria, contra a planta calibrada (não usa o motor) |
 | `furuta -bench` | tempo do MPC por etapa, com planta simulada (não usa o motor) |
 | `furuta -ident <l2>` | identificação por oscilação livre → I2, μ2 |
 | `furuta -status` / `-driver <0\|1>` | estado da malha / liga ou desliga o DRV8825 |
@@ -203,6 +204,15 @@ Sequência típica: `furuta -home`, depois `furuta -dry` para conferir os sinais
 | `controle` | a cada período do MPC (ensaio) | t, θ1, θ2, dθ1, dθ2, u, a, n_qp, n_it, t_calc, estouros |
 | `sensores` | 50 Hz | θ1, θ2, θ2_topo (0 = topo), dθ1, dθ2 |
 | `maquina` | 2 Hz (texto) | estado da malha, fase do ensaio, chaves, nFAULT, encoder |
+
+### Testar sem o pêndulo: furuta -sim
+
+`furuta -sim` roda um ensaio completo dentro da ESP, em tempo real (um passo a cada Ts), com o mesmo controlador e o
+mesmo orçamento de tempo do `furuta -start`. A planta é a do simulador do PC ([comum/planta.c](comum/planta.c), seção
+`[sim]` do `furuta.ini`): atrito seco, encoder de 12 bits, θ1 em passos inteiros, saturações da malha de 1 kHz e
+atraso de um período. Os tópicos `controle` e `sensores` mostram a simulação como se fosse o pêndulo real; o motor
+não se mexe. Para outro ensaio, mude a semente: `cfg -set sim.semente=3`. No fim sai um resumo: tempo de subida,
+fração no topo, tempo do MPC e da planta e estouros.
 
 ### Comparar métodos com o bench
 
