@@ -8,7 +8,7 @@ ifeq ($(OS),Windows_NT)
 LDLIBS += -lwinmm
 endif
 
-COMUM  = $(addprefix ../comum/,estimador.c qlpv_mpc.c modelo.c chronos.c config.c controlador.c)
+COMUM  = $(addprefix ../comum/,estimador.c qlpv_mpc.c modelo.c chronos.c config.c controlador.c planta.c)
 NUCLEO = $(COMUM) periodo.c
 HDRS   = *.h ../comum/*.h
 

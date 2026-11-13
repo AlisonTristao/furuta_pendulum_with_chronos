@@ -9,6 +9,7 @@
 #include "estimador.h"
 #include "modelo.h"
 #include "periodo.h"
+#include "planta.h"
 #include "qlpv_mpc.h"
 
 #include <math.h>
@@ -20,15 +21,6 @@
 
 #define PI 3.14159265358979323846
 static double wrap(double a) { return a - 2 * PI * floor((a + PI) / (2 * PI)); }
-
-/* normal(0,1) (Box-Muller), semente fixa: ensaios simulados repetíveis */
-static unsigned long long s_rng = 88172645463325252ull;
-static double unif(void)
-{
-    s_rng ^= s_rng << 13, s_rng ^= s_rng >> 7, s_rng ^= s_rng << 17;
-    return ((s_rng >> 11) + 0.5) * (1.0 / 9007199254740992.0);
-}
-static double gauss(void) { return sqrt(-2 * log(unif())) * cos(2 * PI * unif()); }
 
 int main(int argc, char **argv)
 {
@@ -45,24 +37,14 @@ int main(int argc, char **argv)
     config_imprime(&cfg);
     const ensaio *e = &cfg.e;
     modelo m = modelo_de_fisico(cfg.f, e->Ts, cfg.mpc.dtheta_max);
-    modelo planta = m;                            /* a planta pode ter atrito seco; o MPC não */
-    planta.tc2 = e->tc2;
-    if (e->mu2_planta > 0) planta.mu2 = e->mu2_planta;
+    planta p;                                     /* a planta pode ter atrito seco; o MPC não (planta.c) */
+    planta_cria(&p, &cfg);
+    double *x = p.x;                              /* estado verdadeiro */
     if (e->tc2 > 0) printf("planta com atrito seco tc2 = %g N·m (o MPC não modela)\n", e->tc2);
-    double x[4] = {e->x0[0], e->x0[1], e->x0[2], e->x0[3]};
-    if (e->semente > 0) {                         /* ensaio diferente a cada semente */
-        s_rng += 0x9E3779B97F4A7C15ull * (unsigned long long)e->semente;
-        x[1] += 0.1 * (unif() - 0.5);
-    }
     estimador est;
     estimador_cria(&est, e->est_L1, e->est_L2);
     double a_cmd = 0;                             /* último comando enviado */
     double xm[4] = {x[0], x[1], x[2], x[3]};      /* o que o controle vê */
-    double th_est = x[1], w_est = x[3], fila[256] = {0};   /* fila: comando por ms (atraso) */
-    long tms = 0;   /* observador de θ2 (como no firmware, 1 kHz) */
-    double q = e->bits_enc > 0 ? 2 * PI / (1 << e->bits_enc) : 0;
-    double ppr = e->passos_rev > 0 ? e->passos_rev / (2 * PI) : 0, th1_med = x[0], th1c = x[0], v_fw = x[2];
-    double ws = 2 * PI * e->f_motor;              /* ressonância do rotor (0 = braço rígido) */
     if (e->planta_acel) {
         printf("planta comandada em aceleração | observador %g Hz | atraso %g ms | encoder %d bits (ruído %g LSB)\n",
                e->obs_hz, e->atraso_ms, e->bits_enc, e->ruido_enc);
@@ -117,54 +99,12 @@ int main(int argc, char **argv)
         }
         double ud = u + (t >= e->t_disturbio && t < e->t_disturbio + e->dur_disturbio ? e->u_disturbio : 0);
         if (!e->planta_acel) {
-            modelo_passo(&planta, x, ud, e->rk4_sub);
+            modelo_passo(&p.m, x, ud, e->rk4_sub);
             for (int i = 0; i < 4; i++) xm[i] = x[i];
             continue;
         }
-        /* 1 ms por vez: o comando novo entra após atraso_ms; o firmware lê o encoder e atualiza o observador */
-        double ad = a + (ud - u) * 200;           /* distúrbio de torque ~ em aceleração (aprox.) */
-        int nms = (int)lround(e->Ts * 1e3), nat = e->embarcado ? nms : (int)lround(e->atraso_ms);
-        if (nat > 200) nat = 200;
-        for (int j = 0; j < nms; j++) fila[(tms + nat + j) & 255] = ad;
-        for (int j = 0; j < nms; j++) {
-            /* malha de 1 kHz do firmware (malha_rodando): satura a, integra v, freia antes do limite, satura v */
-            double ac = fila[tms++ & 255], v0 = v_fw;
-            if (e->a_max_fw > 0) ac = fmax(-e->a_max_fw, fmin(e->a_max_fw, ac));
-            double v = v0 + ac * 1e-3;
-            if (e->limite_fw > 0 && e->a_max_fw > 0) {
-                double parada = v * v / (2 * e->a_max_fw);
-                if (v > 0 && th1_med + parada >= e->limite_fw) v = fmax(v0 - e->a_max_fw * 1e-3, 0);
-                if (v < 0 && th1_med - parada <= -e->limite_fw) v = fmin(v0 + e->a_max_fw * 1e-3, 0);
-            }
-            if (e->v_max_fw > 0) v = fmax(-e->v_max_fw, fmin(e->v_max_fw, v));
-            v_fw = v;
-            if (ws <= 0) {                              /* braço rígido: segue a velocidade comandada */
-                modelo_passo_acel(&planta, x, (v - v0) * 1e3, 1e-3, 1);
-                x[2] = v;
-                th1c = x[0];
-            } else {                                    /* rotor = mola até a posição dos passos (ressonância) */
-                for (int i = 0; i < 10; i++) {
-                    th1c += v * 1e-4;
-                    double alvo = ppr > 0 ? floor(th1c * ppr) / ppr : th1c;
-                    /* erro do micropasso: periódico a cada passo inteiro (200/volta) */
-                    alvo += e->ripple_passo * (2 * PI / 200) * sin(200 * alvo);
-                    double ar = ws * ws * (alvo - x[0]) + 2 * e->zeta_motor * ws * (v - x[2]);
-                    modelo_passo_acel(&planta, x, ar, 1e-4, 1);
-                }
-            }
-            /* θ1 medido = passos inteiros (acumulador do gerador de passos trunca); dθ1 = velocidade comandada */
-            th1_med = ppr > 0 ? floor(th1c * ppr) / ppr : th1c;
-            double ang = x[1] + (e->ruido_enc > 0 ? e->ruido_enc * q * gauss() : 0);
-            double med = q > 0 ? q * floor(ang / q) : ang;
-            if (e->obs_hz > 0) {
-                double wn = 2 * PI * e->obs_hz, er = med - th_est;
-                th_est += 1e-3 * (w_est + 2 * wn * er);
-                w_est += 1e-3 * wn * wn * er;
-            } else {
-                w_est = x[3];
-            }
-            xm[0] = th1_med, xm[1] = med, xm[2] = v_fw, xm[3] = w_est;
-        }
+        planta_passo(&p, a + (ud - u) * 200);     /* distúrbio de torque ~ em aceleração (aprox.) */
+        for (int i = 0; i < 4; i++) xm[i] = p.xm[i];
     }
     printf("passos %d | swing-up (|θ2| < 0,1 rad) em %.2f s | x final = (%.3f, %.3f, %.3f, %.3f)\n", k, t_up, x[0],
            x[1], x[2], x[3]);
