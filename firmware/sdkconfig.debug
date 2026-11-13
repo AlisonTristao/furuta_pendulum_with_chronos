@@ -1,0 +1,8 @@
+# Ambiente esp32s3_debug: console e logs no USB-Serial-JTAG (a mesma USB nativa) para ver o boot. Quando o
+# TinyUSB sobe, a USB troca para o CDC do BTP e o console some: serve para achar travamentos antes disso.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_BOOTLOADER_LOG_LEVEL_INFO=y
+CONFIG_BTPDEV_LOG_LEVEL_INFO=y
+# pânico: imprime e para (não reinicia), para o backtrace ficar no console
+CONFIG_ESP_SYSTEM_PANIC_PRINT_HALT=y

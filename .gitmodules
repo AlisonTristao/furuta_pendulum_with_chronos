@@ -1,0 +1,10 @@
+[submodule "firmware/extern/BTPDevice"]
+	path = firmware/extern/BTPDevice
+	url = https://github.com/AlisonTristao/BTPDevice.git
+	branch = feature/app-class
+[submodule "firmware/extern/BTP"]
+	path = firmware/extern/BTP
+	url = https://github.com/AlisonTristao/BTP.git
+[submodule "firmware/extern/TinyShell"]
+	path = firmware/extern/TinyShell
+	url = https://github.com/AlisonTristao/TinyShell.git
