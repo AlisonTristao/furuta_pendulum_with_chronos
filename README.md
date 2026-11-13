@@ -197,11 +197,11 @@ de a USB passar para o BTP.
 
 Sequência típica: `furuta -home`, depois `furuta -dry` para conferir os sinais, depois `furuta -start`.
 
-**Tópicos** para plotar:
+**Tópicos** para plotar (cada campo declara a faixa do eixo: θ1 ±1,8 rad, θ2 ±π, dθ1 ±25 rad/s, dθ2 ±40 rad/s, u ±1, a ±300 rad/s², t_calc 0-20 ms):
 
 | Tópico | Taxa | Campos |
 |---|---|---|
-| `controle` | a cada período do MPC (ensaio) | t, θ1, θ2, dθ1, dθ2, u, a, n_qp, n_it, t_calc, estouros |
+| `controle` | a cada período do MPC (ensaio) | t, θ1, θ2 (0 = topo), dθ1, dθ2, u, a, n_qp, n_it, t_calc, estouros |
 | `sensores` | 50 Hz | θ1, θ2, θ2_topo (0 = topo), dθ1, dθ2 |
 | `maquina` | 2 Hz (texto) | estado da malha, fase do ensaio, chaves, nFAULT, encoder |
 
