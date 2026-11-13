@@ -38,6 +38,10 @@ void embarcado_config_padrao(void)
 {
     if (s_ativo) return;
     config_le_texto(furuta_ini, strlen(furuta_ini), &s_cfg);
+    // furuta -sim sem o atrito seco do pêndulo: com ele o equilíbrio fica num ciclo limite (θ1 ±0,24 rad a ~0,8 Hz,
+    // θ2 ±2°), como no real; para ver os gráficos limpos. O sim.exe continua com o do furuta.ini. Volta com
+    // cfg -set sim.tc2=2e-4
+    s_cfg.e.tc2 = 0;
 }
 
 static int resumo(const config *c, char *buf, int n)

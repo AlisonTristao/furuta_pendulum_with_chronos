@@ -209,8 +209,9 @@ Sequência típica: `furuta -home`, depois `furuta -dry` para conferir os sinais
 
 `furuta -sim` roda um ensaio completo dentro da ESP, em tempo real (um passo a cada Ts), com o mesmo controlador e o
 mesmo orçamento de tempo do `furuta -start`. A planta é a do simulador do PC ([comum/planta.c](comum/planta.c), seção
-`[sim]` do `furuta.ini`): atrito seco, encoder de 12 bits, θ1 em passos inteiros, saturações da malha de 1 kHz e
-atraso de um período. Os tópicos `controle` e `sensores` mostram a simulação como se fosse o pêndulo real; o motor
+`[sim]` do `furuta.ini`): encoder de 12 bits, θ1 em passos inteiros, saturações da malha de 1 kHz e
+atraso de um período. O atrito seco do pêndulo vem desligado na ESP (com ele o equilíbrio fica num ciclo limite de
+~±0,24 rad no braço, como no real); `cfg -set sim.tc2=2e-4` liga. Os tópicos `controle` e `sensores` mostram a simulação como se fosse o pêndulo real; o motor
 não se mexe. Para outro ensaio, mude a semente: `cfg -set sim.semente=3`. No fim sai um resumo: tempo de subida,
 fração no topo, tempo do MPC e da planta e estouros.
 
