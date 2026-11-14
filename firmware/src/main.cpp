@@ -6,6 +6,7 @@
 //   furuta -start | -dry | -stop | -bench                      ensaio (embarcado.c): controle, a seco, para, benchmark
 //   furuta -sim                                                ensaio simulado em tempo real, com telemetria (sem motor)
 //   furuta -ident <l2>                                         oscilação livre -> I2, mu2 (ident.c; era o ident.exe)
+//   furuta -calibra                                            zero do θ2 pelo centro da oscilação livre (ident.c)
 //   cfg -set <secao.chave=valor> | -show | -reset             configuração (chaves do pc/furuta.ini; listas com
 //                                                              espaço: cfg -set mpc.Q=10 100 5 1)
 //   pinos -entradas | -i2c | -motor                            teste de bancada (pinos.c)
@@ -91,6 +92,10 @@ public:
                 gravacao_reinicia_depois();
                 return uint8_t{RESULT_OK};
             }, "furuta -gravar: reinicia no modo de gravação (sem BOOT/RESET)")
+            .add("calibra", [] {
+                const char* e = ident_calibra();
+                return e ? err(e) : uint8_t{RESULT_OK};
+            }, "furuta -calibra: zero do θ2 pelo centro da oscilação livre (solte de 30-60°; até ~50 s)")
             .add("ident", [](float l2) {
                 const char* e = ident_roda(l2);
                 return e ? err(e) : uint8_t{RESULT_OK};

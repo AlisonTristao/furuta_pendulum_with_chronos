@@ -100,6 +100,11 @@ bool embarcado_telemetria(telemetria_t *t, unsigned espera_ms)
 static long long relogio_us(void) { return esp_timer_get_time(); }
 #define FOLGA_US 2500   /* do período: estimador, compensação, telemetria (o resto é orçamento do MPC) */
 
+/* Zero do θ2 pela oscilação (ident.c). Se o repouso no -start discordar mais que isso, o encoder foi mexido. */
+#define ZERO_TOLERA 0.05
+static bool s_zero_calibrado = false;
+void embarcado_zero_calibrado(void) { s_zero_calibrado = true; }
+
 static double wrap(double a) { return a - 2 * PI_D * floor((a + PI_D) / (2 * PI_D)); }
 
 // Um ensaio inteiro (modo 1 ou 2). Devolve o motivo do fim.
@@ -165,10 +170,16 @@ static const char *roda_ensaio(int modo)
                 parte = quieto && t_espera - t_quieto > 1.0;
                 if (parte) {
                     double desloc = PI_D - soma_th2 / n_th2;
-                    controle_desloca_pendulo((float)desloc);
-                    x[1] += desloc;
-                    saida_aviso("zero do θ2 pela média de %d leituras: corrigido em %+.4f rad (%+.2f°)", n_th2, desloc,
-                                desloc * 180 / PI_D);
+                    if (s_zero_calibrado && fabs(desloc) < ZERO_TOLERA) {   // a oscilação é melhor que o repouso
+                        saida_aviso("zero do θ2 da calibração mantido (o repouso difere %+.2f°)", desloc * 180 / PI_D);
+                    } else {
+                        if (s_zero_calibrado) s_zero_calibrado = false;     // mexeram no encoder: calibração perdida
+                        controle_desloca_pendulo((float)desloc);
+                        x[1] += desloc;
+                        saida_aviso("zero do θ2 pela média de %d leituras parado: corrigido em %+.4f rad (%+.2f°)%s",
+                                    n_th2, desloc, desloc * 180 / PI_D,
+                                    s_zero_calibrado ? "" : " (furuta -calibra fica mais exato)");
+                    }
                 }
             }
             if (t_espera > 60) {

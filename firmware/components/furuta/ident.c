@@ -7,14 +7,20 @@
  * Mede o período (ωd, corrigido para a amplitude) e o decaimento dos picos (σ = ζ ωn), e devolve I2 e μ2 para o m2
  * da configuração (a massa só escala I2 e μ2 juntos).
  *
- * Passos: furuta -zera com o pêndulo parado embaixo -> levante e segure o pêndulo -> furuta -ident 0.085 (trava o
- * braço, sem homing) -> solte -> grava 20 s a partir da soltura (braço parado) -> driver desligado. */
+ * Passos: levante e segure o pêndulo -> furuta -ident 0.085 (trava o braço, sem homing) -> solte -> grava 20 s a
+ * partir da soltura (braço parado) -> driver desligado.
+ *
+ * Zero do θ2 (furuta -calibra, e também no -ident): a oscilação livre é simétrica em torno da vertical verdadeira.
+ * Com três extremos seguidos e1, e2, e3, o centro é c = (e1 + 2 e2 + e3)/4: exato com atrito seco (a amplitude cai
+ * em reta e o centro de cada meio-ciclo alterna ±Tc/k) e erro de 2a ordem com atrito viscoso. Média de todas as
+ * trincas com amplitude > AMP_MIN. Melhor que o pêndulo parado, que o atrito seco segura fora da vertical. */
 #include "controle.h"
 #include "embarcado.h"
 #include "ident.h"
 #include "saida.h"
 
 #include <math.h>
+#include <stdbool.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -25,9 +31,10 @@
 #define ESPERA_MAX 30.0    /* espera pela soltura [s] */
 #define NMAX 5010          /* (DUR + ESPERA_MAX) / TAM + folga */
 #define PMAX 400           /* meios-ciclos */
+#define AMP_MIN 0.03       /* extremo mínimo para o centro [rad] (~20 resoluções do encoder) */
 
 static float s_phi[NMAX];
-static double s_tz[PMAX + 1], s_tp[PMAX], s_ap[PMAX], s_la[PMAX];
+static double s_tz[PMAX + 1], s_tp[PMAX], s_ap[PMAX], s_la[PMAX], s_ext[PMAX];
 
 static double t_de(int i) { return i * TAM; }
 
@@ -45,6 +52,45 @@ static double reta(const double *t, const double *y, int n, double *a, double *b
         ssr += r * r;
     }
     return sst > 0 ? 1 - ssr / sst : 0;
+}
+
+/* Centro da oscilação a partir de i0 (ver o cabeçalho). Extremos: o maior |φ − c0| entre dois cruzamentos de c0,
+ * com refinamento por parábola nos 3 pontos em volta. Duas passadas: c0 = média, depois c0 = o centro achado. */
+static const char *centro(int i0, int n, double *c, int *ntrincas)
+{
+    const float *phi = s_phi;
+    double c0 = 0;
+    for (int i = i0; i < n; i++) c0 += phi[i];
+    c0 /= (n - i0);
+    for (int passada = 0; passada < 2; passada++) {
+        int ne = 0, im = -1;
+        bool primeiro = true;                             /* 1º meio-ciclo começa no meio (soltura): descarta */
+        double am = 0;
+        for (int i = i0 + 1; i < n && ne < PMAX; i++) {
+            double v = phi[i] - c0;
+            if (fabs(v) > am) am = fabs(v), im = i;
+            if ((phi[i - 1] - c0 < 0) != (v < 0)) {           /* cruzou c0: fecha o meio-ciclo */
+                if (!primeiro && im > i0 && im < n - 1 && am > AMP_MIN) {
+                    double y0 = phi[im - 1], y1 = phi[im], y2 = phi[im + 1], den = y0 - 2 * y1 + y2;
+                    double d = den != 0 ? 0.5 * (y0 - y2) / den : 0;
+                    if (fabs(d) > 1) d = 0;
+                    s_ext[ne++] = y1 - 0.25 * (y0 - y2) * d;     /* valor do vértice da parábola */
+                }
+                am = 0, im = -1, primeiro = false;
+            }
+        }
+        double soma = 0;
+        int k = 0;
+        for (int j = 0; j + 2 < ne; j++) {
+            if ((s_ext[j] - c0 > 0) == (s_ext[j + 1] - c0 > 0)) continue;   /* precisa alternar */
+            soma += (s_ext[j] + 2 * s_ext[j + 1] + s_ext[j + 2]) / 4, k++;
+        }
+        if (k < 3) return "poucos ciclos (menos de 3 trincas de extremos com amplitude > 0,03 rad)";
+        c0 = soma / k;
+        *ntrincas = k;
+    }
+    *c = c0;
+    return NULL;
 }
 
 static const char *analisa(int n, double g, double l2, double m2)
@@ -105,25 +151,26 @@ static const char *analisa(int n, double g, double l2, double m2)
     return NULL;
 }
 
-const char *ident_roda(double l2)
+/* Trava o braço, espera a soltura e grava φ = θ2 − π até DUR s depois dela. Devolve o nº de amostras (ou -1) e o
+ * índice da soltura; desliga o driver no fim. */
+static int grava(const char **erro, int *isolto)
 {
-    if (embarcado_ativo()) return "tem um ensaio rodando";
-    if (controle_estado() == EST_RODANDO || controle_estado() == EST_HOMING) return "a malha está ocupada";
-    if (!(l2 > 0.01 && l2 < 1)) return "informe o l2 medido em metros (ex.: furuta -ident 0.085)";
-    double m2, g;
-    embarcado_massa(&m2, &g);
+    *erro = NULL;
     controle_origem_aqui();                       // trava o braço aqui (sem homing)
-    if (controle_estado() != EST_PRONTO) return "não travou o braço";
-    saida_printf("braço travado. SOLTE o pêndulo quando quiser (até %.0f s) e não encoste mais.\n", ESPERA_MAX);
-
+    if (controle_estado() != EST_PRONTO) {
+        *erro = "não travou o braço";
+        return -1;
+    }
+    saida_printf("braço travado. Levante o pêndulo uns 30-60°, SOLTE quando quiser (até %.0f s) e não encoste mais.\n",
+                 ESPERA_MAX);
     int n = 0;
     double t_solto = -1;
-    const char *erro = NULL;
+    *isolto = 0;
     TickType_t ultimo = xTaskGetTickCount();
     while (n < NMAX) {
         xTaskDelayUntil(&ultimo, pdMS_TO_TICKS((int)(TAM * 1000)));
         if (!controle_acel(0.0f)) {               // aceleração 0: braço parado, watchdog alimentado
-            erro = controle_erro()[0] ? controle_erro() : "a malha saiu de READY";
+            *erro = controle_erro()[0] ? controle_erro() : "a malha saiu de READY";
             break;
         }
         leitura_t x;
@@ -132,16 +179,56 @@ const char *ident_roda(double l2)
         s_phi[n++] = x.t2 - (float)PI;
         if (t_solto < 0 && fabsf(s_phi[n - 1]) > 0.1f && fabsf(x.dt2) > 1.0f) {   // saiu da mão: ganhou velocidade
             t_solto = tt;
+            *isolto = n - 1;
             saida_printf("solto em t = %.1f s, gravando %.0f s...\n", tt, DUR);
         }
         if (t_solto < 0 && tt > ESPERA_MAX) {
-            erro = "não detectou a soltura";
+            *erro = "não detectou a soltura";
             break;
         }
         if (t_solto >= 0 && tt > t_solto + DUR) break;
     }
     controle_habilita(false);
     saida_printf("%d amostras, driver desligado (refaça o homing)\n", n);
-    if (erro) return erro;
+    return *erro ? -1 : n;
+}
+
+/* Centro da oscilação gravada -> corrige o zero do θ2 e as amostras gravadas. */
+static const char *zera_pelo_centro(int n, int isolto)
+{
+    double c;
+    int k;
+    const char *e = centro(isolto, n, &c, &k);
+    if (e) return e;
+    controle_desloca_pendulo((float)-c);
+    for (int i = 0; i < n; i++) s_phi[i] -= (float)c;
+    embarcado_zero_calibrado();
+    saida_printf("zero do θ2 pelo centro da oscilação (%d trincas de extremos): corrigido em %+.4f rad (%+.2f°)\n", k,
+                 -c, -c * 180 / PI);
+    return NULL;
+}
+
+const char *ident_calibra(void)
+{
+    if (embarcado_ativo()) return "tem um ensaio rodando";
+    if (controle_estado() == EST_RODANDO || controle_estado() == EST_HOMING) return "a malha está ocupada";
+    const char *erro;
+    int isolto, n = grava(&erro, &isolto);
+    if (n < 0) return erro;
+    return zera_pelo_centro(n, isolto);
+}
+
+const char *ident_roda(double l2)
+{
+    if (embarcado_ativo()) return "tem um ensaio rodando";
+    if (controle_estado() == EST_RODANDO || controle_estado() == EST_HOMING) return "a malha está ocupada";
+    if (!(l2 > 0.01 && l2 < 1)) return "informe o l2 medido em metros (ex.: furuta -ident 0.085)";
+    double m2, g;
+    embarcado_massa(&m2, &g);
+    const char *erro;
+    int isolto, n = grava(&erro, &isolto);
+    if (n < 0) return erro;
+    erro = zera_pelo_centro(n, isolto);           // os cruzamentos por zero do período precisam do zero certo
+    if (erro) saida_printf("zero não corrigido: %s\n", erro);
     return analisa(n, g, l2, m2);
 }

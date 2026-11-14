@@ -26,6 +26,8 @@ void embarcado_config_padrao(void);    // volta ao pc/furuta.ini embutido
 // Resumo da configuração em uso (texto de uma linha por grupo). Devolve o tamanho escrito.
 int embarcado_config_texto(char *buf, int n);
 void embarcado_massa(double *m2, double *g);   // da configuração em uso (furuta -ident)
+// O zero do θ2 veio da oscilação (furuta -calibra/-ident): o -start só confere o repouso, sem sobrescrever.
+void embarcado_zero_calibrado(void);
 
 // Liga: modo 1 = controle (precisa de READY após o homing; espera a condição de partida do ensaio e então
 // controla por ensaio.duracao); modo 2 = a seco (calcula com os sensores, mas não comanda o motor); modo 3 =
