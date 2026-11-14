@@ -45,7 +45,7 @@ constexpr double kFolga = 1.2;
 constexpr double kTheta1 = 1.8 * kFolga;    // curso do braço: meio curso medido 1,71 rad
 constexpr double kVel = 25 * kFolga;     // V_MAX da malha (dθ1) [rad/s]
 constexpr double kVel2 = 40 * kFolga;    // ensaio.dtheta2_aborta [rad/s]
-constexpr double kU = 1 * kFolga;        // torque virtual: mpc.u_max padrão 0,75 [N·m]
+constexpr double kU = 2.5 * kFolga;      // torque virtual: mpc.u_max padrão 2,5 [N·m]
 constexpr double kAcel = 300 * kFolga;   // A_MAX da malha [rad/s²]
 constexpr double kAng = kPi * kFolga;    // θ2 em [-π, π)
 
