@@ -34,6 +34,7 @@ typedef struct {
     double comp_atraso_ms;                        /* prediz o estado este tempo à frente (com o último comando) antes do MPC */
     int estimador;                                /* 1: dθ2 pelo estimador com modelo no PC (estimador.h) */
     double est_L1, est_L2;
+    int lado;                                     /* swing-up: θ2 inicial +π (1) ou −π (−1, espelho: impulso invertido) */
     double impulso_a, impulso_ms;                 /* impulso inicial (controlador.c): +a na 1ª metade, -a na 2ª [rad/s², ms] */
     int embarcado;                                /* 1: controle no ESP32 (malha.exe) / como no ESP32 (sim.exe):
                                                      atraso fixo de um período, controlador.h */

@@ -9,6 +9,8 @@ int controlador_cria(controlador *k, const config *cfg, const double x0[4])
     k->m = modelo_de_fisico(k->cfg.f, e->Ts, k->cfg.mpc.dtheta_max);
     /* θ2 no múltiplo de 2π mais próximo do topo (equilíbrio) ou de embaixo (swing-up); depois fica contínuo */
     k->off2 = e->equilibrio ? 2 * PI_D * floor((x0[1] + PI_D) / (2 * PI_D)) : 2 * PI_D * floor(x0[1] / (2 * PI_D));
+    /* lado −1: parte de −π (o MPC sobe pelo outro lado, o espelho do +π) */
+    if (!e->equilibrio && e->lado < 0) k->off2 += 2 * PI_D;
     double x[4] = {x0[0], x0[1] - k->off2, x0[2], x0[3]};
     k->c = mpc_cria(&k->cfg.mpc, &k->m, x, 0.0);
     if (!k->c) return -1;
@@ -37,7 +39,7 @@ double controlador_passo(controlador *k, double x[4], double t, mpc_info *in)
     /* impulso inicial: tira o pêndulo do repouso (parado embaixo o MPC demora a "pegar"). +a na 1ª metade, -a na
      * 2ª: o braço começa e termina parado. O MPC segue calculando (warm start) e o estimador usa o aplicado. */
     if (e->impulso_ms > 0 && t < e->impulso_ms * 1e-3 - 1e-9) {
-        a = t < e->impulso_ms * 0.5e-3 - 1e-9 ? e->impulso_a : -e->impulso_a;
+        a = (t < e->impulso_ms * 0.5e-3 - 1e-9 ? e->impulso_a : -e->impulso_a) * (e->lado < 0 ? -1 : 1);
         u = 0;
     }
     k->u = u;
