@@ -117,7 +117,8 @@ static const char *roda_ensaio(int modo)
 
     s_fase = modo == 1 ? FASE_ESPERA : FASE_SECO;
     bool criado = false;
-    double a_pend = 0, t_quieto = -1, t_espera = 0;
+    double a_pend = 0, t_quieto = -1, t_espera = 0, soma_th2 = 0;
+    int n_th2 = 0;
     int k = 0, K = (int)lround(e->duracao / e->Ts);
     unsigned estouros = 0;
     const char *motivo = "fim da duração";
@@ -150,11 +151,25 @@ static const char *roda_ensaio(int modo)
             bool parte;
             if (e->equilibrio) {
                 parte = fabs(th) < e->janela_equilibrio && fabs(x[3]) < 2;
-            } else {                              // parado embaixo por 1 s
-                bool quieto = fabs(fabs(th) - PI_D) < 0.1 && fabs(x[3]) < 0.1;
-                if (!quieto) t_quieto = -1;
-                else if (t_quieto < 0) t_quieto = t_espera;
+            } else {
+                // parado embaixo por 1 s. Vale qualquer ângulo: o zero sai daqui. Pendurado e parado, o pêndulo aponta
+                // para baixo pela gravidade, então θ2 = π é a média dessas leituras (não uma leitura só, como o -zera)
+                bool quieto = fabs(x[3]) < 0.1;
+                if (!quieto) {
+                    t_quieto = -1;
+                    soma_th2 = 0, n_th2 = 0;
+                } else {
+                    if (t_quieto < 0) t_quieto = t_espera;
+                    soma_th2 += x[1], n_th2++;
+                }
                 parte = quieto && t_espera - t_quieto > 1.0;
+                if (parte) {
+                    double desloc = PI_D - soma_th2 / n_th2;
+                    controle_desloca_pendulo((float)desloc);
+                    x[1] += desloc;
+                    saida_aviso("zero do θ2 pela média de %d leituras: corrigido em %+.4f rad (%+.2f°)", n_th2, desloc,
+                                desloc * 180 / PI_D);
+                }
             }
             if (t_espera > 60) {
                 motivo = "60 s sem a condição de partida";

@@ -25,6 +25,7 @@ bool controle_acel(float a);
 bool controle_homing(void);   // inicia o homing (liga o driver); false se não for possível agora
 void controle_origem_aqui(void);   // theta1 = 0 na posição atual, limite ±LIM_SEM_HOMING_RAD (bancada)
 void controle_zera_pendulo(void);  // pêndulo parado embaixo: theta2 = pi
+void controle_desloca_pendulo(float delta);   // theta2 += delta (zero pela média, embarcado.c)
 void controle_habilita(bool ligado);
 float controle_meio_curso(void);
 float controle_limite(void);       // limite de software de |theta1|

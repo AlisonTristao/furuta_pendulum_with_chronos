@@ -19,6 +19,8 @@ bool encoder_atualiza(float dt);
 
 // Define o zero: o ângulo atual passa a valer `angulo` (pêndulo parado embaixo -> pi).
 void encoder_define(float angulo);
+// Soma `delta` ao ângulo medido (corrige o zero sem depender da leitura deste instante).
+void encoder_desloca(float delta);
 
 float encoder_angulo(void);              // rad, contínuo
 float encoder_velocidade(void);          // rad/s

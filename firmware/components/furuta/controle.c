@@ -25,7 +25,8 @@ static volatile float s_meio_curso = 0.0f, s_limite = 0.0f;
 static volatile float s_a_cmd = 0.0f;
 static volatile int64_t s_t_cmd = 0;
 static volatile bool s_novo_cmd = false;
-static volatile bool s_ped_homing, s_ped_origem, s_ped_zera;
+static volatile bool s_ped_homing, s_ped_origem, s_ped_zera, s_ped_desloca;
+static volatile float s_desloca;
 static volatile int s_ped_hab = -1;
 static volatile bool s_pronto_init = false;
 
@@ -102,6 +103,10 @@ static void processa_pedidos(int32_t passos)
     if (s_ped_zera) {
         s_ped_zera = false;
         encoder_define(PI_F);
+    }
+    if (s_ped_desloca) {
+        encoder_desloca(s_desloca);
+        s_ped_desloca = false;
     }
     if (s_ped_origem) {
         s_ped_origem = false;
@@ -322,6 +327,13 @@ void controle_zera_pendulo(void)
 {
     s_ped_zera = true;
     espera(&s_ped_zera);
+}
+
+void controle_desloca_pendulo(float delta)
+{
+    s_desloca = delta;
+    s_ped_desloca = true;
+    espera(&s_ped_desloca);
 }
 
 void controle_habilita(bool ligado)

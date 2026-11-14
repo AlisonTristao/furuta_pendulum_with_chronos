@@ -155,5 +155,11 @@ void encoder_define(float angulo)
     s_th_est += desloc;
 }
 
+void encoder_desloca(float delta)
+{
+    s_ang_zero += delta;
+    s_th_est += delta;
+}
+
 float encoder_angulo(void) { return s_modelo ? angulo_medido() : 0.0f; }
 float encoder_velocidade(void) { return s_w_est; }
