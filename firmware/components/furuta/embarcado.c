@@ -52,11 +52,11 @@ static int resumo(const config *c, char *buf, int n)
                     "mpc: Np=%d horizonte=%.3f discretizacao=%s Q=%g,%g,%g,%g Rdu=%g u=[%.3f,%.3f] peso_exp=%.2f "
                     "l_max=%d theta1=[%.3f,%.3f]\n"
                     "fisico: L1=%.4f l2=%.4f m2=%.5f I2=%.4e mu2=%.4e\n"
-                    "ensaio: Ts=%.3f duracao=%.1f modo=%s comp_atraso_ms=%.0f impulso=%.0f/%.0f estimador=%d",
+                    "ensaio: Ts=%.3f duracao=%.1f modo=%s lado=%d comp_atraso_ms=%.0f impulso=%.0f/%.0f estimador=%d",
                     m->Np, (double)m->horizonte, modelo_disc_nome(m->discretizacao), (double)m->Q[0], (double)m->Q[1], (double)m->Q[2], (double)m->Q[3],
                     (double)m->Rdu, (double)m->u_min, (double)m->u_max, (double)m->peso_exp, m->l_max,
                     (double)m->theta1_min, (double)m->theta1_max, c->f.L1, c->f.l2, c->f.m2, c->f.I2, c->f.mu2, e->Ts,
-                    e->duracao, e->equilibrio ? "equilibrio" : "swingup", e->comp_atraso_ms, e->impulso_a,
+                    e->duracao, e->equilibrio ? "equilibrio" : "swingup", e->lado, e->comp_atraso_ms, e->impulso_a,
                     e->impulso_ms, e->estimador);
 }
 
