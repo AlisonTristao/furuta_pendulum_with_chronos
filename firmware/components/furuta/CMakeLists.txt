@@ -1,7 +1,7 @@
 # Núcleo do pêndulo em C: malha de 1 kHz, motor de passo, encoder, homing, controle embarcado (MPC no núcleo 1),
 # benchmark e teste de pinos. Não conhece o BTP: o texto sai por saida.c, que o src/main.cpp liga ao TraceView.
 
-# pc/furuta.ini embutido (furuta_ini.c, gerado aqui a cada configuração do CMake): é a configuração padrão do
+# pc/furuta.ini embutido (furuta_ini.c, gerado aqui a cada configuração do CMake e pelo gera_ini.py a cada build): é a configuração padrão do
 # controle no boot (embarcado.c), a mesma do simulador. O PlatformIO não roda o EMBED_TXTFILES do IDF.
 set(INI ${CMAKE_CURRENT_LIST_DIR}/../../../pc/furuta.ini)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INI})
