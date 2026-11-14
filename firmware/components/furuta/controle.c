@@ -140,7 +140,8 @@ static void tarefa(void *arg)
         .pull_down_en = !FIM_PULL_UP,
     };
     gpio_config(&in);
-    gpio_config_t flt = {.pin_bit_mask = 1ULL << PIN_FLT, .mode = GPIO_MODE_INPUT};
+    // nFAULT é dreno aberto: pull-up interno (no S3 todo pino tem; no ESP32 o GPIO34 não tinha e era só externo)
+    gpio_config_t flt = {.pin_bit_mask = 1ULL << PIN_FLT, .mode = GPIO_MODE_INPUT, .pull_up_en = GPIO_PULLUP_ENABLE};
     gpio_config(&flt);
     ESP_LOGI(TAG, "entradas ok, laço de %d Hz", CTRL_HZ);
     s_pronto_init = true;
@@ -158,7 +159,13 @@ static void tarefa(void *arg)
             else if (++s_erros_enc >= ENC_ERROS_MAX && s_estado != EST_FALHA) falha("ENCODER_I2C");
         }
         bool fneg = debounce(&s_chave_neg), fpos = debounce(&s_chave_pos);
-        bool flt = USA_PINO_FALHA && gpio_get_level(PIN_FLT) == 0;
+        // nFAULT filtrado: cada leitura em 0 soma, cada em 1 desconta. Um pico de ruído do motor não derruba o ensaio;
+        // falha de verdade (subtensão fica em 0; sobrecorrente volta a cada 1,6 ms) acumula em poucos ms
+        static int cont_flt = 0;
+        if (USA_PINO_FALHA && gpio_get_level(PIN_FLT) == 0) cont_flt++;
+        else if (cont_flt > 0) cont_flt--;
+        if (cont_flt > FLT_FILTRO) cont_flt = FLT_FILTRO;
+        bool flt = cont_flt >= FLT_FILTRO;
         s_fim_neg = fneg;
         s_fim_pos = fpos;
         s_flt = flt;

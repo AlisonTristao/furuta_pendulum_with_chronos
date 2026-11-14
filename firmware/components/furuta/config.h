@@ -10,7 +10,7 @@
 #define PIN_STEP     GPIO_NUM_4
 #define PIN_DIR      GPIO_NUM_5
 #define PIN_EN       GPIO_NUM_6    // DRV8825 nENABLE: 0 = driver ligado
-#define PIN_FLT      GPIO_NUM_7    // DRV8825 nFAULT: 0 = falha (SEM pull-up interno)
+#define PIN_FLT      GPIO_NUM_7    // DRV8825 nFAULT: 0 = falha (dreno aberto, pull-up interno ligado)
 #define PIN_M0       GPIO_NUM_15
 #define PIN_M1       GPIO_NUM_16
 #define PIN_M2       GPIO_NUM_17
@@ -49,4 +49,5 @@
 #define CTRL_HZ            1000
 #define WATCHDOG_MS        200      // sem comando por esse tempo: freia até parar
 #define DESLIGA_OCIOSO_MS  10000    // parado em READY por esse tempo: desliga o driver e volta a IDLE
-#define USA_PINO_FALHA     1        // 0 se o nFAULT não tiver pull-up externo
+#define USA_PINO_FALHA     1        // 0 ignora o nFAULT (pino desligado)
+#define FLT_FILTRO         3        // leituras de 1 ms em 0 (saldo) até acusar DRV8825_FAULT: filtra o ruído do motor
