@@ -14,6 +14,7 @@ typedef struct {
     double x0[4];                                 /* só na simulação */
     int rk4_sub;                                  /* só na simulação: subpassos da planta */
     double tc2;                                   /* só na simulação: atrito seco do pêndulo [N·m] */
+    double offset_th2;                            /* só na simulação: erro do zero do encoder do pêndulo [rad] */
     int planta_acel;                              /* só na simulação: 1 = planta comandada em θ̈1, como o hardware */
     double obs_hz;                                /* só na simulação: dθ2 pelo observador do firmware (0 = ideal) */
     double atraso_ms;                             /* só na simulação: atraso entre a leitura e o novo comando */

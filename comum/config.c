@@ -115,7 +115,8 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     }
 
     NUM("sim", "t_disturbio", c->e.t_disturbio) NUM("sim", "u_disturbio", c->e.u_disturbio)
-    NUM("sim", "dur_disturbio", c->e.dur_disturbio) NUM("sim", "tc2", c->e.tc2) INT("sim", "rk4_sub", c->e.rk4_sub)
+    NUM("sim", "dur_disturbio", c->e.dur_disturbio) NUM("sim", "tc2", c->e.tc2) NUM("sim", "offset_th2", c->e.offset_th2)
+    INT("sim", "rk4_sub", c->e.rk4_sub)
     INT("sim", "planta_acel", c->e.planta_acel) NUM("sim", "obs_hz", c->e.obs_hz)
     NUM("sim", "atraso_ms", c->e.atraso_ms) INT("sim", "bits_enc", c->e.bits_enc)
     NUM("sim", "ruido_enc", c->e.ruido_enc) NUM("sim", "passos_rev", c->e.passos_rev)

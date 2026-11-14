@@ -71,7 +71,7 @@ void planta_passo(planta *p, double a)
         }
         /* θ1 medido = passos inteiros (acumulador do gerador de passos trunca); dθ1 = velocidade comandada */
         p->th1_med = p->ppr > 0 ? floor(p->th1c * p->ppr) / p->ppr : p->th1c;
-        double ang = x[1] + (e->ruido_enc > 0 ? e->ruido_enc * p->q * gauss(p) : 0);
+        double ang = x[1] + e->offset_th2 + (e->ruido_enc > 0 ? e->ruido_enc * p->q * gauss(p) : 0);
         double med = p->q > 0 ? p->q * floor(ang / p->q) : ang;
         if (e->obs_hz > 0) {
             double wn = 2 * PI * e->obs_hz, er = med - p->th_est;
