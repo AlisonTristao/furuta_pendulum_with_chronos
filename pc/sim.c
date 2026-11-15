@@ -110,6 +110,13 @@ int main(int argc, char **argv)
            x[1], x[2], x[3]);
     printf("t_calc: médio %.2f ms, máx %.2f ms | QPs por passo: %.2f | máx |θ̈1| = %.1f rad/s²\n", soma_tc / (k ? k : 1), max_tc,
            soma_qp / (k ? k : 1), max_a);
+    if (e->embarcado && e->trim)
+        printf("trim do zero do θ2: %+.4f rad (%+.2f°) | erro do zero na planta (sim.offset_th2): %+.4f rad\n", ctl.trim,
+               ctl.trim * 180 / 3.14159265358979, e->offset_th2);
+    if (e->embarcado)
+        printf("impulso: %.0f ms, energia %.3f, θ1 %+.3f θ2 %+.3f dθ1 %+.2f dθ2 %+.2f na passagem ao MPC | re-referências %d | repouso %.1f s\n",
+               ctl.imp_t * 1e3, ctl.imp_e, ctl.imp_x[0], ctl.imp_x[1], ctl.imp_x[2], ctl.imp_x[3], ctl.rerefs,
+               ctl.n_repouso * e->Ts);
     if (out) fclose(out);
     if (e->embarcado) controlador_libera(&ctl);
     else mpc_libera(c);

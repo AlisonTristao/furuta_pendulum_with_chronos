@@ -11,7 +11,7 @@ file(WRITE ${CMAKE_CURRENT_LIST_DIR}/furuta_ini.c
      "/* gerado pelo CMakeLists.txt a partir de pc/furuta.ini: não editar */\n"
      "const char furuta_ini[] = {${_ini} 0};\n")
 
-idf_component_register(SRCS bench.c controle.c embarcado.c encoder.c furuta_ini.c homing.c ident.c pinos.c saida.c stepper.c
+idf_component_register(SRCS bench.c controle.c embarcado.c encoder.c furuta_ini.c homing.c ident.c inclina.c pinos.c saida.c stepper.c termopar.c
                        INCLUDE_DIRS "."
                        REQUIRES mpc esp_driver_gpio
-                       PRIV_REQUIRES esp_driver_gptimer esp_driver_i2c esp_timer esp_rom esp_hw_support)
+                       PRIV_REQUIRES nvs_flash esp_driver_gptimer esp_driver_i2c esp_timer esp_rom esp_hw_support)

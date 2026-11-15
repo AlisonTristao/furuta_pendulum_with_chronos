@@ -4,6 +4,8 @@
 // Terminal (help lista tudo):
 //   furuta -home | -origem | -zera | -driver <0|1> | -status   malha interna (controle.c)
 //   furuta -start | -dry | -stop | -bench                      ensaio (embarcado.c): controle, a seco, para, benchmark
+//   furuta -auto                                               zera + homing + calibração + lado pelo offset + start
+//   furuta -inclina                                            varredura do braço: inclinação da mesa (inclina.c)
 //   furuta -sim                                                ensaio simulado em tempo real, com telemetria (sem motor)
 //   furuta -ident <l2>                                         oscilação livre -> I2, mu2 (ident.c; era o ident.exe)
 //   furuta -calibra                                            zero do θ2 pelo centro da oscilação livre (ident.c)
@@ -13,7 +15,7 @@
 // Tópicos:
 //   controle  a cada período do MPC durante o ensaio (evento): t, θ1, θ2 ([-π, π), 0 = topo), dθ1, dθ2 (estimado), u, a, n_qp, n_it,
 //             t_calc, estouros
-//   sensores  leitura da malha de 1 kHz, até 50 Hz (também fora do ensaio)
+//   sensores  leitura da malha de 1 kHz, até 125 Hz (também fora do ensaio)
 //   maquina   texto: estado da malha, erro, fase do ensaio, chaves, nFAULT, encoder
 //
 // Tarefas: comms (prioridade 10) e shell da BTPDevice no núcleo 0, abaixo da malha de 1 kHz (configMAX - 2); a
@@ -27,13 +29,17 @@ extern "C" {
 #include "embarcado.h"
 #include "encoder.h"
 #include "ident.h"
+#include "inclina.h"
 #include "pinos.h"
 #include "saida.h"
+#include "stepper.h"
+#include "termopar.h"
 }
 
 #include "gravacao.h"
 
 #include "esp_log.h"
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -49,8 +55,20 @@ constexpr double kVel2 = 40 * kFolga;    // ensaio.dtheta2_aborta [rad/s]
 constexpr double kU = 2.5 * kFolga;      // torque virtual: mpc.u_max padrão 2,5 [N·m]
 constexpr double kAcel = 300 * kFolga;   // A_MAX da malha [rad/s²]
 constexpr double kAng = kPi * kFolga;    // θ2 em [-π, π)
+constexpr double kAngHist = 1.5 * kPi * kFolga;   // θ2 com histerese em [-3π/2, 3π/2]
 
 float wrap(float a) { return a - 2.0f * kPi * std::floor((a + kPi) / (2.0f * kPi)); }
+
+// θ2 do envio ao TraceView: tira voltas inteiras só quando passa de ±3π/2 (deitado, depois de uma volta a mais).
+// O corte seco em ±π cai bem embaixo, onde o pêndulo passa o tempo todo; com a histerese ele não salta nem embaixo
+// (±π) nem no topo (0), só quando gira de verdade. Só no envio: a malha continua com o contínuo.
+float wrap_histerese(float a) {
+    static float voltas = 0.0f;   // múltiplo de 2π já descontado (só a tarefa comms chama)
+    float y = a - voltas;
+    while (y > 1.5f * kPi) voltas += 2.0f * kPi, y -= 2.0f * kPi;
+    while (y < -1.5f * kPi) voltas -= 2.0f * kPi, y += 2.0f * kPi;
+    return y;
+}
 
 class Furuta : public btpdev::App {
 public:
@@ -78,6 +96,12 @@ public:
             .add("driver", [](uint8_t on) { return driver(on); }, "furuta -driver <0|1>: desliga/liga o DRV8825")
             .add("status", [] { return status(); }, "furuta -status: estado, chaves, encoder, ensaio")
             .add("start", [] { return liga(1); }, "furuta -start: controle (após o homing; espera a partida)")
+            .add("auto", [] { return automatico(); },
+                 "furuta -auto: zera (pêndulo parado embaixo), homing, zero pela oscilação (inclinacao.pontos), lado "
+                 "do swing-up pelo sinal do offset do topo (ensaio.lado_auto) e start")
+            .add("inclina", [] { return inclina(true); },
+                 "furuta -inclina: varre o braço e mede a inclinação da mesa, gravada na flash (após o homing, pêndulo "
+                 "pendurado; ~1 min: deixe o motor esfriar antes do start)")
             .add("dry", [] { return liga(2); }, "furuta -dry: a seco (calcula com os sensores, sem motor)")
             .add("stop", [] {
                 embarcado_desliga();
@@ -139,6 +163,7 @@ public:
                         .range(0, 100 * kFolga)
                         .f32("t_calc", "ms", 0, 20 * kFolga)
                         .u16("estouros")
+                        .f32("trim", "rad", -0.1, 0.1)   // trim do zero do θ2 (seção [trim] do furuta.ini)
                         .fill([this](btpdev::Sample& s) {
                             telemetria_t tl;
                             taskENTER_CRITICAL(&mux_);
@@ -154,11 +179,12 @@ public:
                                 .put("n_qp", tl.n_qp)
                                 .put("n_it", tl.n_it)
                                 .put("t_calc", tl.t_calc_ms)
-                                .put("estouros", tl.estouros);
+                                .put("estouros", tl.estouros)
+                                .put("trim", tl.trim);
                         });
-        t.topic("sensores", btpdev::Hz(50))
+        t.topic("sensores", btpdev::Hz(125))   // 8 ms: período inteiro no agendador de 1 ms
             .f32("theta1", "rad", -kTheta1, kTheta1)
-            .f32("theta2", "rad")                        // contínuo, sem faixa (acumula voltas)
+            .f32("theta2", "rad", -kAngHist, kAngHist)     // só no envio: voltas tiradas com histerese (wrap_histerese)
             .f32("theta2_topo", "rad", -kAng, kAng)        // θ2 em [-π, π): 0 = topo
             .f32("dtheta1", "rad/s", -kVel, kVel)
             .f32("dtheta2", "rad/s", -kVel2, kVel2)
@@ -171,17 +197,22 @@ public:
                     controle_leitura(&x);
                 }
                 s.put("theta1", x.t1)
-                    .put("theta2", x.t2)
+                    .put("theta2", wrap_histerese(x.t2))
                     .put("theta2_topo", wrap(x.t2))
                     .put("dtheta1", x.dt1)
                     .put("dtheta2", x.dt2);
             });
+        t.topic("temperatura", btpdev::Hz(2))   // termopar do driver (MAX6675; termopar.c): NAN sem leitura
+            .f32("driver", "°C", 0, 120)
+            .fill([](btpdev::Sample& s) { s.put("driver", termopar_temp()); });
         t.text("maquina", btpdev::Hz(2), [](btpdev::Text& out) {
             estado_t e = controle_estado();
-            out.printf("malha %s%s%s | ensaio %s | fim_neg %d fim_pos %d nFAULT %d | encoder %s | limite θ1 %.3f rad",
+            out.printf("malha %s%s%s | ensaio %s | fim_neg %d fim_pos %d nFAULT %d | encoder %s | limite θ1 %.3f rad | "
+                       "driver %.1f °C (%s)",
                        controle_estado_nome(e), controle_erro()[0] ? " - " : "", controle_erro(),
                        embarcado_fase_nome(embarcado_fase()), controle_fim_neg(), controle_fim_pos(),
-                       controle_falha_driver(), encoder_nome(), (double)controle_limite());
+                       controle_falha_driver(), encoder_nome(), (double)controle_limite(), (double)termopar_temp(),
+                       termopar_estado());
         });
     }
 
@@ -199,14 +230,17 @@ public:
     }
 
 private:
+    // Também no painel de logs: um comando que passa de 5 s (homing, -inclina, -auto) tem a resposta descartada
+    // pelo TraceView (btp::kCommandTimeoutMs), e o log chega de qualquer jeito.
     static uint8_t err(const char* motivo) {
+        btpdev::log(btpdev::LogLevel::Error, "erro: %s", motivo);
         btpdev::printf("erro: %s\n", motivo);
         return RESULT_ERROR;
     }
 
     static uint8_t curso() {
-        btpdev::printf("pronto: meio curso %.4f rad, limite de software ±%.4f rad\n", (double)controle_meio_curso(),
-                       (double)controle_limite());
+        saida_aviso("pronto: meio curso %.4f rad, limite de software ±%.4f rad", (double)controle_meio_curso(),
+                    (double)controle_limite());
         return RESULT_OK;
     }
 
@@ -214,7 +248,14 @@ private:
         if (embarcado_ativo()) return err("tem um ensaio rodando");
         if (!controle_homing()) return err("a malha está rodando");
         while (controle_estado() == EST_HOMING) vTaskDelay(pdMS_TO_TICKS(20));
-        return controle_estado() == EST_PRONTO ? curso() : err(controle_erro());
+        if (controle_estado() != EST_PRONTO) return err(controle_erro());
+        int32_t perdidos;
+        bool solto;
+        if (controle_desvio_homing(&perdidos, &solto))   // ±2-3 passos é a repetibilidade das chaves
+            saida_aviso("passos perdidos desde o último homing: %+ld (%+.2f°)%s", (long)perdidos,
+                        perdidos / (double)PASSOS_POR_RAD * 180 / 3.14159265358979,
+                        solto ? " - o driver desligou no meio: o braço pode ter sido mexido" : "");
+        return curso();
     }
 
     static uint8_t origem() {
@@ -234,22 +275,65 @@ private:
         leitura_t x;
         controle_leitura(&x);
         btpdev::printf("malha %s %s | ensaio %s | fim_neg %d fim_pos %d nFAULT %d | encoder %s\n"
-                       "θ1 %.4f θ2 %.4f dθ1 %.3f dθ2 %.3f | meio curso %.4f limite %.4f\n",
+                       "θ1 %.4f θ2 %.4f dθ1 %.3f dθ2 %.3f | meio curso %.4f limite %.4f\n"
+                       "driver %.2f °C (termopar: %s)\n",
                        controle_estado_nome(controle_estado()), controle_erro(), embarcado_fase_nome(embarcado_fase()),
                        controle_fim_neg(), controle_fim_pos(), controle_falha_driver(), encoder_nome(), (double)x.t1,
                        (double)x.t2, (double)x.dt1, (double)x.dt2, (double)controle_meio_curso(),
-                       (double)controle_limite());
+                       (double)controle_limite(), (double)termopar_temp(), termopar_estado());
         return RESULT_OK;
     }
 
     static uint8_t liga(int modo) {
         const char* e = embarcado_liga(modo);
         if (e) return err(e);
-        btpdev::printf("%s\n", modo == 1 ? "controle ligado: esperando a condição de partida"
+        saida_aviso("%s", modo == 1 ? "controle ligado: esperando a condição de partida"
                                : modo == 2 ? "a seco ligado"
                                : modo == 3 ? "bench rodando no núcleo 1"
                                            : "simulação ligada (furuta -stop para)");
         return RESULT_OK;
+    }
+
+    static uint8_t inclina(bool varredura) {
+        const char* e = inclina_roda(varredura);
+        return e ? err(e) : RESULT_OK;
+    }
+
+    // Zera o θ2 (pêndulo parado embaixo), homing, calibração embaixo (inclinacao.pontos: 1 = só o zero em θ1 = 0,
+    // >= 4 = varredura da mesa), lado do swing-up e start. O lado vem do sinal do offset do topo (ensaio.lado_auto ·
+    // sinal(trim.valor)); com lado_auto = 0 ou offset zero, é sorteado (esp_random: RNG de hardware). Fica na config
+    // em uso, como um cfg -set ensaio.lado: o cfg -show mostra o escolhido.
+    static uint8_t automatico() {
+        if (embarcado_ativo()) return err("tem um ensaio rodando");
+        // o zera é uma leitura só: espera o pêndulo parar (θ2 variando menos de 0,01 rad por 1 s, até 20 s), senão
+        // logo depois de um -stop ele pega o pêndulo balançando (14/11: ±6,8°). Pela posição e não pelo dθ2: parado
+        // na divisa entre duas contagens do encoder, a leitura alterna 1 LSB e o observador dá picos de ~0,8 rad/s
+        int quieto_ms = 0, espera_ms = 0;
+        float th_min = 0, th_max = 0;
+        for (; quieto_ms < 1000 && espera_ms < 20000; espera_ms += 20) {
+            leitura_t x;
+            controle_leitura(&x);
+            if (quieto_ms == 0) th_min = th_max = x.t2;
+            th_min = std::fmin(th_min, x.t2), th_max = std::fmax(th_max, x.t2);
+            quieto_ms = th_max - th_min < 0.01f ? quieto_ms + 20 : 0;
+            vTaskDelay(pdMS_TO_TICKS(20));
+        }
+        controle_zera_pendulo();
+        saida_aviso("-auto: θ2 = π (pêndulo %s embaixo, %.1f s esperando); homing...",
+                    quieto_ms >= 1000 ? "parado" : "AINDA BALANÇANDO", espera_ms * 1e-3);
+        if (home() != RESULT_OK) return RESULT_ERROR;   // home() já imprimiu o motivo
+        inclinacao_params ip;
+        embarcado_inclinacao_params(&ip);
+        if (ip.pontos > 0 && inclina(false) != RESULT_OK) return RESULT_ERROR;
+        int lado = embarcado_lado_auto();
+        const bool sorteado = lado == 0;
+        if (sorteado) lado = (esp_random() & 1U) ? 1 : -1;
+        if (!embarcado_config(lado > 0 ? "ensaio.lado=1" : "ensaio.lado=-1")) return err("não deu para mudar o lado");
+        const double off = embarcado_offset_topo();
+        saida_aviso("-auto: lado %+d (sobe por %s) %s; offset do topo %+.4f rad (%+.2f°); start", lado,
+                    lado > 0 ? "+π" : "−π", sorteado ? "sorteado" : "pelo sinal do offset (ensaio.lado_auto)", off,
+                    off * 180 / 3.14159265358979);
+        return liga(1);
     }
 
     static uint8_t set(const char* par) {
@@ -298,11 +382,13 @@ extern "C" void app_main(void) {
 #endif
     ESP_LOGI(TAG, "controle_init");
     controle_init();   // malha de 1 kHz e ISR dos passos no núcleo 0
+    termopar_init();   // temperatura do driver (MAX6675), tarefa de 4 Hz no núcleo 0
     ESP_LOGI(TAG, "embarcado_init");
     embarcado_init();  // configuração = pc/furuta.ini embutido; tarefa do MPC no núcleo 1
     saida_registra(saida_btp);
     ESP_LOGI(TAG, "device.begin (a USB passa para o TinyUSB)");
     device.begin();    // falha: a causa fica em device.last_error() (sem USB não há como mostrar)
-    gravacao_init();   // toque de 1200 baud -> modo de gravação (pio run -t upload sem os botões)
+    gravacao_init();
+    embarcado_inclinacao_carrega();   // a mesa medida pelo -inclina (NVS: o BTPDevice inicializa no begin)   // toque de 1200 baud -> modo de gravação (pio run -t upload sem os botões)
     xTaskCreatePinnedToCore(tarefa_telemetria, "telemetria", 4096, nullptr, 4, nullptr, 0);
 }

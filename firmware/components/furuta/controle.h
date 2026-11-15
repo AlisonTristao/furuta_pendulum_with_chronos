@@ -3,6 +3,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef enum { EST_OCIOSO, EST_HOMING, EST_PRONTO, EST_RODANDO, EST_FALHA } estado_t;
 
@@ -23,6 +24,20 @@ bool controle_falha_driver(void);
 // Comando da malha externa: aceleração do braço (rad/s²). Só aceito em PRONTO/RODANDO.
 bool controle_acel(float a);
 bool controle_homing(void);   // inicia o homing (liga o driver); false se não for possível agora
+// Movimentos feitos pela própria malha, a partir de READY (false se não estiver em READY). Um comando de
+// controle_acel ou o homing cancelam. controle_movendo() fica true até acabar.
+bool controle_vai(float alvo);                 // até theta1 = alvo, perfil trapezoidal do homing
+// θ̈1 = A cos(w t) por `ciclos` ciclos (v = A/w sin(w t)): na frequência do pêndulo a oscilação dele cresce a cada
+// ciclo; o braço anda até 2A/w² e volta parado ao mesmo lugar
+bool controle_excita(float A, float w, int ciclos);
+bool controle_movendo(void);
+// Repouso: true corta a corrente do motor (EN do DRV8825) sem perder a posição do indexador nem os passos contados;
+// false religa. Só vale em READY/RUN; o braço fica solto enquanto isso (empurrado à mão, o θ1 contado erra).
+void controle_solta_braco(bool solto);
+// Depois de um homing: centro novo − centro do homing anterior [passos] = passos que o motor perdeu entre os dois
+// (positivo: o braço andou menos no sentido negativo do que o contado). *solto: o driver desligou no meio (o braço
+// pode ter sido mexido à mão). false no primeiro homing ou depois de um furuta -origem.
+bool controle_desvio_homing(int32_t *passos, bool *solto);
 void controle_origem_aqui(void);   // theta1 = 0 na posição atual, limite ±LIM_SEM_HOMING_RAD (bancada)
 void controle_zera_pendulo(void);  // pêndulo parado embaixo: theta2 = pi
 void controle_desloca_pendulo(float delta);   // theta2 += delta (zero pela média, embarcado.c)

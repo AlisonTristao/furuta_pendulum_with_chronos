@@ -29,6 +29,22 @@ static void padroes(config *c)
     e.lado = 1;
     e.impulso_a = 80;
     e.impulso_ms = 200;
+    e.reref = 0;
+    e.reref_angulo = 0.26;
+    e.banda_th2 = 0.02;
+    e.banda_dth2 = 0.1;
+    e.banda_dth1 = 0;
+    e.repouso = 1;
+    e.repouso_dth1 = 0.3;
+    e.repouso_a = 1.5;
+    e.repouso_solta = 1;
+    e.trim_tau = 8;
+    e.trim_max = 0.06;
+    e.trim_janela = 0.15;
+    e.incl_pontos = 7;
+    e.incl_grava = 5;
+    e.incl_amplitude = 1.0;
+    e.incl_ciclos = 3;
     c->e = e;
 }
 
@@ -104,7 +120,12 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("ensaio", "janela_equilibrio", c->e.janela_equilibrio)
     INT("ensaio", "estimador", c->e.estimador) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
     NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) INT("ensaio", "embarcado", c->e.embarcado)
-    INT("ensaio", "lado", c->e.lado) NUM("ensaio", "impulso_a", c->e.impulso_a) NUM("ensaio", "impulso_ms", c->e.impulso_ms)
+    INT("ensaio", "lado", c->e.lado) INT("ensaio", "lado_auto", c->e.lado_auto) NUM("ensaio", "impulso_a", c->e.impulso_a) NUM("ensaio", "impulso_ms", c->e.impulso_ms)
+    INT("ensaio", "reref", c->e.reref) NUM("ensaio", "reref_angulo", c->e.reref_angulo)
+    NUM("ensaio", "banda_th2", c->e.banda_th2) NUM("ensaio", "banda_dth2", c->e.banda_dth2)
+    NUM("ensaio", "banda_dth1", c->e.banda_dth1)
+    INT("ensaio", "repouso", c->e.repouso) NUM("ensaio", "repouso_dth1", c->e.repouso_dth1)
+    NUM("ensaio", "repouso_a", c->e.repouso_a) INT("ensaio", "repouso_solta", c->e.repouso_solta)
     if (!strcmp(sec, "ensaio") && !strcmp(k, "modo")) {
         if (strcmp(v, "equilibrio") && strcmp(v, "swingup")) return -1;
         c->e.equilibrio = !strcmp(v, "equilibrio");
@@ -115,6 +136,14 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
         return 0;
     }
 
+    INT("trim", "liga", c->e.trim) NUM("trim", "tau", c->e.trim_tau) NUM("trim", "max", c->e.trim_max)
+    NUM("trim", "janela", c->e.trim_janela) NUM("trim", "valor", c->e.trim_valor)
+
+    INT("inclinacao", "pontos", c->e.incl_pontos) NUM("inclinacao", "grava", c->e.incl_grava)
+    NUM("inclinacao", "amplitude", c->e.incl_amplitude)
+    INT("inclinacao", "ciclos", c->e.incl_ciclos) NUM("inclinacao", "seno", c->e.incl_seno)
+    NUM("inclinacao", "cosseno", c->e.incl_cosseno)
+
     NUM("sim", "t_disturbio", c->e.t_disturbio) NUM("sim", "u_disturbio", c->e.u_disturbio)
     NUM("sim", "dur_disturbio", c->e.dur_disturbio) NUM("sim", "tc2", c->e.tc2) NUM("sim", "offset_th2", c->e.offset_th2)
     INT("sim", "rk4_sub", c->e.rk4_sub)
@@ -122,7 +151,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     NUM("sim", "atraso_ms", c->e.atraso_ms) INT("sim", "bits_enc", c->e.bits_enc)
     NUM("sim", "ruido_enc", c->e.ruido_enc) NUM("sim", "passos_rev", c->e.passos_rev)
     NUM("sim", "a_max", c->e.a_max_fw) NUM("sim", "v_max", c->e.v_max_fw) NUM("sim", "limite_sw", c->e.limite_fw)
-    NUM("sim", "f_motor", c->e.f_motor) NUM("sim", "zeta_motor", c->e.zeta_motor)
+    INT("sim", "estatico", c->e.estatico) NUM("sim", "f_motor", c->e.f_motor) NUM("sim", "zeta_motor", c->e.zeta_motor)
     NUM("sim", "mu2_planta", c->e.mu2_planta) INT("sim", "semente", c->e.semente)
     NUM("sim", "ripple_passo", c->e.ripple_passo)
     if (!strcmp(sec, "sim") && !strcmp(k, "x0")) return lista(v, c->e.x0, 4) == 4 ? 0 : -1;

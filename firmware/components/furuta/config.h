@@ -18,6 +18,10 @@
 #define PIN_FIM_POS  GPIO_NUM_11   // fim de curso do lado theta1 > 0
 #define PIN_SDA      GPIO_NUM_8
 #define PIN_SCL      GPIO_NUM_9
+// termopar do driver (módulo MAX6675: SPI só de leitura, bit-bang em termopar.c). VCC 3,3 V.
+#define PIN_TC_SCK   GPIO_NUM_12
+#define PIN_TC_CS    GPIO_NUM_13
+#define PIN_TC_SO    GPIO_NUM_14
 // SLP = RST = 3,3 V (sempre acordado).
 
 // ---------------------------------------------------------------- motor
@@ -42,7 +46,7 @@
 // ---------------------------------------------------------------- encoder
 #define ENC_SINAL          1        // -1 inverte o sentido de theta2
 #define ENC_I2C_HZ         100000   // 400 kHz dá timeout só com os pull-ups internos
-#define ENC_BANDA_VEL_HZ   40.0f    // banda do observador de velocidade de theta2
+#define ENC_BANDA_VEL_HZ   40.0f    // banda do observador de velocidade de theta2 (20 Hz estragou o swing-up)
 #define ENC_ERROS_MAX      20       // leituras I2C seguidas com erro até entrar em falha
 
 // ---------------------------------------------------------------- malha interna

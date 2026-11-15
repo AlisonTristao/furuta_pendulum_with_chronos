@@ -36,6 +36,16 @@ void planta_cria(planta *p, const config *cfg)
     p->ws = 2 * PI * e->f_motor;                 /* ressonância do rotor (0 = braço rígido) */
 }
 
+/* Atrito estático no pêndulo (sim.estatico, modelo de Karnopp): quase parado e com o torque que tenta movê-lo
+ * (gravidade + acoplamento com o braço) menor que o atrito seco tc2, fica preso onde estava. O tanh do modelo só
+ * freia: sem isto o pêndulo nunca fica parado em pé com o controle desligado, como fica no real. */
+static void prende(const planta *p, double *x, double th_ant, double a)
+{
+    const modelo *m = &p->m;
+    if (!p->e.estatico || m->tc2 <= 0 || fabs(x[3]) > 0.02) return;
+    if (fabs(m->eta * sin(th_ant) - m->gamma * cos(th_ant) * a) < m->tc2) x[1] = th_ant, x[3] = 0;
+}
+
 void planta_passo(planta *p, double a)
 {
     const ensaio *e = &p->e;
@@ -56,7 +66,9 @@ void planta_passo(planta *p, double a)
         if (e->v_max_fw > 0) v = fmax(-e->v_max_fw, fmin(e->v_max_fw, v));
         p->v_fw = v;
         if (p->ws <= 0) {                        /* braço rígido: segue a velocidade comandada */
+            double th_ant = x[1];
             modelo_passo_acel(&p->m, x, (v - v0) * 1e3, 1e-3, 1);
+            prende(p, x, th_ant, (v - v0) * 1e3);
             x[2] = v;
             p->th1c = x[0];
         } else {                                 /* rotor = mola até a posição dos passos (ressonância) */
@@ -66,7 +78,9 @@ void planta_passo(planta *p, double a)
                 /* erro do micropasso: periódico a cada passo inteiro (200/volta) */
                 alvo += e->ripple_passo * (2 * PI / 200) * sin(200 * alvo);
                 double ar = p->ws * p->ws * (alvo - x[0]) + 2 * e->zeta_motor * p->ws * (v - x[2]);
+                double th_ant = x[1];
                 modelo_passo_acel(&p->m, x, ar, 1e-4, 1);
+                prende(p, x, th_ant, ar);
             }
         }
         /* θ1 medido = passos inteiros (acumulador do gerador de passos trunca); dθ1 = velocidade comandada */

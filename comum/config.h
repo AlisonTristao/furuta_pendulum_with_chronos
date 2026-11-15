@@ -35,10 +35,35 @@ typedef struct {
     int estimador;                                /* 1: dθ2 pelo estimador com modelo no PC (estimador.h) */
     double est_L1, est_L2;
     int lado;                                     /* swing-up: θ2 inicial +π (1) ou −π (−1, espelho: impulso invertido) */
+    int lado_auto;                                /* furuta -auto: lado = lado_auto·sinal(trim.valor); 0 sorteia */
     double impulso_a, impulso_ms;                 /* impulso inicial (controlador.c): +a na 1ª metade, -a na 2ª [rad/s², ms] */
+    int reref;                                    /* 1: depois de uma queda, o alvo pula para o topo à frente (±2π) */
+    double reref_angulo;                          /* |θ2| a partir do topo, caindo, em que pula [rad] */
+    double banda_th2, banda_dth2;                 /* banda morta no equilíbrio: com |θ2| < banda_th2 [rad] e |dθ2| <
+                                                     banda_dth2 [rad/s] o MPC vê o pêndulo parado no topo (0 desliga) */
+    double banda_dth1;                            /* idem, exige também |dθ1| < banda_dth1 [rad/s] (0: não olha) */
+    int repouso;                                  /* 1: no topo, pêndulo parado na banda (banda_th2/_dth2) e braço lento
+                                                     (|dθ1| < repouso_dth1): para o braço e não corrige (controlador.h) */
+    double repouso_dth1, repouso_a;               /* [rad/s] para entrar; |θ̈1| máx. para parar o braço [rad/s²] */
+    int repouso_solta;                            /* 1: no repouso, com o braço parado, corta a corrente do motor (o
+                                                     zumbido do motor parado desfaz o atrito que segura o pêndulo) */
+    int estatico;                                 /* só na simulação: atrito estático no pêndulo (Karnopp, com tc2) */
     int embarcado;                                /* 1: controle no ESP32 (malha.exe) / como no ESP32 (sim.exe):
                                                      atraso fixo de um período, controlador.h */
     double janela_equilibrio;                     /* |θ2| (rad) em que o modo equilíbrio assume */
+    /* trim do zero do θ2 no equilíbrio, em tempo real (controlador.c, seção [trim]) */
+    int trim;                                     /* 1: aprende (trim_valor vale sempre, como offset fixo) */
+    double trim_tau;                              /* constante de tempo [s]: bem mais lenta que o equilíbrio */
+    double trim_max;                              /* |trim| máximo [rad] */
+    double trim_janela;                           /* só aprende com |θ2| abaixo disso [rad] */
+    double trim_valor;                            /* trim inicial [rad]; o firmware guarda aqui o aprendido */
+    /* inclinação da mesa (seção [inclinacao]): o topo verdadeiro fica em θ2 = seno·sin θ1 + cosseno·(cos θ1 − 1)
+     * (controlador_inclinacao). O firmware mede com a varredura do furuta -inclina (inclina.c) */
+    int incl_pontos;                              /* posições do braço na varredura (0: o -auto não varre) */
+    double incl_grava;                            /* oscilação gravada em cada posição [s] */
+    double incl_amplitude;                        /* amplitude nominal (sem atrito) da excitação ressonante [rad] */
+    int incl_ciclos;                              /* ciclos da excitação (θ̈1 = A cos(ωn t)) */
+    double incl_seno, incl_cosseno;               /* coeficientes medidos [rad] */
 } ensaio;
 
 typedef struct {

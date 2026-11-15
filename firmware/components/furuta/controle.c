@@ -28,6 +28,17 @@ static volatile bool s_novo_cmd = false;
 static volatile bool s_ped_homing, s_ped_origem, s_ped_zera, s_ped_desloca;
 static volatile float s_desloca;
 static volatile int s_ped_hab = -1;
+// movimentos feitos pela própria malha (a 1 kHz, sem o atraso de uma tarefa comandando aceleração): 1 = ir até
+// s_mov_alvo com perfil trapezoidal, 2 = excitação θ̈1 = A cos(w t) por N ciclos (termina parado no mesmo lugar)
+static volatile int s_ped_mov = 0;
+static volatile float s_mov_alvo, s_mov_A, s_mov_w;
+static volatile int s_mov_ciclos;
+static volatile bool s_movendo = false;
+// Repouso com o motor solto (controle_solta_braco): corta a corrente pelo EN do DRV8825, que guarda a posição do
+// indexador (religando, o rotor volta ao mesmo micropasso). Só em READY/RUN; nunca religa um driver desligado de
+// verdade (controle_habilita, falha).
+static volatile bool s_ped_solta = false;
+static bool s_solta = false;
 static volatile bool s_pronto_init = false;
 
 // amostra para o controle embarcado: a cada s_amostra_ms a malha copia a leitura e acorda a tarefa assinante
@@ -40,7 +51,14 @@ static int s_cont_amostra = 0;
 static float s_v = 0.0f;               // velocidade comandada do braço (rad/s)
 static int64_t s_t_pronto = 0;         // última vez que a malha não estava em PRONTO (us)
 static int32_t s_offset = 0;           // passos em theta1 = 0
+// Passos perdidos: o homing acha as chaves de novo; o centro novo menos o anterior (s_offset) é o que o motor
+// deixou de andar desde o último homing (o firmware conta os passos mandados, não os andados).
+static bool s_centro_ok = false;       // s_offset veio de um homing
+static bool s_solto = false;           // o driver desligou desde o último homing (o braço pode ter sido mexido)
+static volatile bool s_desvio_ok = false, s_desvio_solto = false;
+static volatile int32_t s_desvio = 0;
 static int s_erros_enc = 0;
+static int s_mov = 0, s_mov_k = 0;     // movimento em curso (s_ped_mov) e ms desde o início
 
 typedef struct {
     gpio_num_t pino;
@@ -75,6 +93,44 @@ static void falha(const char *msg)
     s_estado = EST_FALHA;
     s_v = 0.0f;
     stepper_habilita(false);
+    s_solto = true;
+}
+
+#define MOV_TAU 0.05f   // no fim da ida a uma posição: v = erro / tau (chega sem passar do ponto)
+
+static void fim_mov(void)
+{
+    s_mov = 0;
+    s_movendo = false;
+}
+
+// Um ms de movimento da malha (s_mov). Devolve a velocidade nova; acaba o movimento quando chega.
+static float malha_movimento(float theta1, float dt)
+{
+    float v = s_v;
+    if (s_mov == 1) {
+        float e = s_mov_alvo - theta1;
+        float mag = fminf(fminf(HOMING_V, sqrtf(2.0f * HOMING_A * fabsf(e))), fabsf(e) / MOV_TAU);
+        v = rampa(s_v, copysignf(mag, e), HOMING_A * dt);
+        if (fabsf(e) < 0.003f && fabsf(v) < 0.06f) {   // 0,003 rad = ~1,5 passo
+            v = 0.0f;
+            fim_mov();
+        }
+    } else {
+        float t = (float)(++s_mov_k) * dt, w = s_mov_w;
+        if (t < (float)s_mov_ciclos * 6.28318530718f / w) {
+            v = s_mov_A / w * sinf(w * t);              // integral exata de A cos(w t): sem deriva
+        } else {
+            v = 0.0f;                                   // a integral volta a zero: tira o resíduo do float
+            fim_mov();
+        }
+    }
+    float parada = v * v / (2.0f * A_MAX);              // mesmos limites de software do malha_rodando
+    if ((v > 0 && theta1 + parada >= s_limite) || (v < 0 && theta1 - parada <= -s_limite)) {
+        v = rampa(s_v, 0.0f, A_MAX * dt);
+        fim_mov();
+    }
+    return v;
 }
 
 // Integra a aceleração pedida, freando antes dos limites de software (distância de parada com A_MAX).
@@ -93,10 +149,12 @@ static float malha_rodando(float theta1, float dt)
 static void processa_pedidos(int32_t passos)
 {
     if (s_ped_hab >= 0) {
+        s_ped_solta = false, s_solta = false;
         bool ligar = s_ped_hab;
         s_ped_hab = -1;
         s_v = 0.0f;
         stepper_habilita(ligar);
+        if (!ligar) s_solto = true;
         s_estado = EST_OCIOSO;          // com o driver desligado o braço pode ter sido movido: refazer homing
         s_erro = "";
     }
@@ -112,6 +170,7 @@ static void processa_pedidos(int32_t passos)
         s_ped_origem = false;
         if (s_estado != EST_HOMING && s_estado != EST_RODANDO) {
             s_offset = passos;
+            s_centro_ok = false;            // origem manual: não é um centro de homing
             s_meio_curso = LIM_SEM_HOMING_RAD;
             s_limite = LIM_SEM_HOMING_RAD;
             s_v = 0.0f;
@@ -120,7 +179,18 @@ static void processa_pedidos(int32_t passos)
             s_estado = EST_PRONTO;
         }
     }
+    if (s_ped_mov) {
+        if (s_estado == EST_PRONTO) {
+            s_mov = s_ped_mov;
+            s_mov_k = 0;
+            s_movendo = true;
+        }
+        s_ped_mov = 0;
+    }
     if (s_ped_homing) {
+        s_ped_solta = false, s_solta = false;
+        s_mov = 0;
+        s_movendo = false;
         s_ped_homing = false;
         s_v = 0.0f;
         s_erro = "";
@@ -186,7 +256,13 @@ static void tarefa(void *arg)
             hom_status_t st = homing_passo(passos, fneg, fpos, s_v, &h);
             s_v = h.imediato ? h.v_alvo : rampa(s_v, h.v_alvo, HOMING_A * dt);
             if (st == HOM_OK) {
-                s_offset = homing_centro();
+                int32_t centro = homing_centro();
+                s_desvio = centro - s_offset;
+                s_desvio_solto = s_solto;
+                s_desvio_ok = s_centro_ok;
+                s_offset = centro;
+                s_centro_ok = true;
+                s_solto = false;
                 s_meio_curso = homing_meio_curso();
                 s_limite = s_meio_curso - FIM_MARGEM_RAD;
                 s_estado = s_limite > 0 ? EST_PRONTO : EST_FALHA;
@@ -207,14 +283,21 @@ static void tarefa(void *arg)
             break;
         case EST_PRONTO:
             if (s_novo_cmd) {               // primeiro comando da malha externa
+                fim_mov();                  // o controle tem prioridade sobre um movimento da malha
                 s_novo_cmd = false;
                 s_estado = EST_RODANDO;
                 s_v = malha_rodando(theta1, dt);
                 break;
             }
+            if (s_mov) {
+                s_v = malha_movimento(theta1, dt);
+                s_t_pronto = agora;         // movendo não é ocioso
+                break;
+            }
             s_v = rampa(s_v, 0.0f, A_MAX * dt);
             if (agora - s_t_pronto > DESLIGA_OCIOSO_MS * 1000LL && s_v == 0.0f) {
                 stepper_habilita(false);    // parado sem uso: desliga o driver (esquenta); refazer o homing
+                s_solto = true;
                 s_estado = EST_OCIOSO;
             }
             break;
@@ -224,6 +307,16 @@ static void tarefa(void *arg)
         case EST_FALHA:
             s_v = 0.0f;
             break;
+        }
+        if (s_estado != EST_PRONTO && s_mov) fim_mov();
+        {
+            bool ativo = s_estado == EST_RODANDO || s_estado == EST_PRONTO;
+            bool quer = s_ped_solta && ativo;
+            if (quer != s_solta) {
+                s_solta = quer;
+                if (quer || ativo) stepper_habilita(!quer);   // saiu de RUN/READY: fica como o resto deixou
+            }
+            if (s_solta) s_v = 0.0f;
         }
         // chave acionada fora do homing = os limites de software falharam
         if ((s_estado == EST_RODANDO || s_estado == EST_PRONTO) && (fneg || fpos))
@@ -301,6 +394,41 @@ bool controle_acel(float a)
     s_a_cmd = a;
     s_t_cmd = esp_timer_get_time();
     s_novo_cmd = true;                    // a malha passa de PRONTO para RODANDO
+    return true;
+}
+
+static bool pede_mov(int tipo)
+{
+    if (s_estado != EST_PRONTO) return false;
+    s_ped_mov = tipo;
+    while (s_ped_mov) vTaskDelay(1);      // a malha aceita (ou recusa) no próximo ms
+    return s_movendo;
+}
+
+bool controle_vai(float alvo)
+{
+    s_mov_alvo = alvo;
+    return pede_mov(1);
+}
+
+bool controle_excita(float A, float w, int ciclos)
+{
+    if (!(w > 1.0f && w < 100.0f) || ciclos < 1 || ciclos > 20 || fabsf(A) > A_MAX) return false;
+    s_mov_A = A;
+    s_mov_w = w;
+    s_mov_ciclos = ciclos;
+    return pede_mov(2);
+}
+
+bool controle_movendo(void) { return s_movendo; }
+
+void controle_solta_braco(bool solto) { s_ped_solta = solto; }
+
+bool controle_desvio_homing(int32_t *passos, bool *solto)
+{
+    if (!s_desvio_ok) return false;
+    *passos = s_desvio;
+    *solto = s_desvio_solto;
     return true;
 }
 

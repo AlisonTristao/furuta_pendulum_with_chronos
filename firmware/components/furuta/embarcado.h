@@ -13,6 +13,7 @@ typedef struct {
     float t, x[4], u, a, t_calc_ms;   // t do ensaio [s]; x = θ1, θ2, dθ1, dθ2 (dθ2 do estimador)
     unsigned char n_qp, n_it;
     unsigned short estouros;
+    float trim;                       // trim do zero do θ2 [rad] (controlador.h)
 } telemetria_t;
 
 typedef enum { FASE_PARADO, FASE_ESPERA, FASE_RODANDO, FASE_SECO, FASE_BENCH, FASE_SIM } fase_t;
@@ -28,6 +29,22 @@ int embarcado_config_texto(char *buf, int n);
 void embarcado_massa(double *m2, double *g);   // da configuração em uso (furuta -ident)
 // O zero do θ2 veio da oscilação (furuta -calibra/-ident): o -start só confere o repouso, sem sobrescrever.
 void embarcado_zero_calibrado(void);
+// Varredura da inclinação (inclina.c): seção [inclinacao] em uso e, pela seção [fisico], o pêndulo pendurado
+// como oscilador φ̈ = −ωn² φ − k θ̈1. _define guarda os coeficientes medidos (e zera o trim); false com ensaio
+// rodando.
+typedef struct {
+    int pontos, ciclos;
+    double grava, amplitude;   // [s], [rad]
+    double wn, k;              // [rad/s], [1]
+    double seno, cosseno;      // inclinação da mesa em uso [rad]
+} inclinacao_params;
+void embarcado_inclinacao_params(inclinacao_params *p);
+// furuta -auto: lado do swing-up pelo sinal do offset do topo (ensaio.lado_auto · sinal(trim.valor)); 0 = sortear
+// (lado_auto = 0 ou offset zero). embarcado_offset_topo = trim.valor em uso [rad].
+int embarcado_lado_auto(void);
+double embarcado_offset_topo(void);
+bool embarcado_inclinacao_define(double seno, double cosseno);   // também grava na flash (NVS)
+void embarcado_inclinacao_carrega(void);   // no boot, depois do device.begin(): a da flash, se houver
 
 // Liga: modo 1 = controle (precisa de READY após o homing; espera a condição de partida do ensaio e então
 // controla por ensaio.duracao); modo 2 = a seco (calcula com os sensores, mas não comanda o motor); modo 3 =

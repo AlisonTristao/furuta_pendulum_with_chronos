@@ -1,0 +1,746 @@
+{
+    "devices": {
+        "devices": [
+            {
+                "autoTarget": true,
+                "baudRate": 5000000,
+                "bleAddress": "",
+                "blePeerUuid": "",
+                "cacheOtaPassword": false,
+                "cachePeerPassword": false,
+                "commType": 0,
+                "description": "",
+                "id": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                "lineTerminator": 1,
+                "name": "furuta",
+                "otaAddress": "",
+                "parentDeviceId": "",
+                "peerSourceId": 0,
+                "portName": "",
+                "robotName": "furuta",
+                "script": "",
+                "tcpHost": "",
+                "tcpPort": 44300,
+                "transportType": 0,
+                "usbPath": ""
+            }
+        ]
+    },
+    "traceview": {
+        "formatVersion": 1
+    },
+    "workspaces": {
+        "activeId": "f47391f8-7e34-4850-adca-95d99b117af3",
+        "list": [
+            {
+                "dashboard": {
+                    "breakpoint": "large",
+                    "canvasHeightMultiplier": {
+                        "medium": 0,
+                        "small": 0
+                    },
+                    "gridPrecision": 2,
+                    "items": [
+                        {
+                            "config": {
+                                "tabs": [
+                                    {
+                                        "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60"
+                                    }
+                                ]
+                            },
+                            "groupId": "",
+                            "id": "f091992b-3609-4e34-aece-0816faed0492",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.35,
+                                    "width": 0.5166666666666667,
+                                    "x": 0,
+                                    "y": 0.65
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0,
+                                    "y": 0
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0
+                                }
+                            },
+                            "name": "",
+                            "type": "serial_monitor"
+                        },
+                        {
+                            "config": {
+                                "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                "series": [
+                                    {
+                                        "color": "#2e6fe0",
+                                        "fieldId": 1,
+                                        "fieldName": "theta1",
+                                        "max": 2.16,
+                                        "min": -2.16,
+                                        "name": "θ₁",
+                                        "style": "solid",
+                                        "unit": "rad"
+                                    },
+                                    {
+                                        "color": "#ff5500",
+                                        "fieldId": 2,
+                                        "fieldName": "theta2",
+                                        "max": 5.654866933822632,
+                                        "min": -5.654866933822632,
+                                        "name": "θ₂",
+                                        "style": "solid",
+                                        "unit": "rad"
+                                    },
+                                    {
+                                        "color": "#798bff",
+                                        "fieldId": 4,
+                                        "fieldName": "dtheta1",
+                                        "max": 30,
+                                        "min": -30,
+                                        "name": "θ̇'₁",
+                                        "style": "dashed",
+                                        "unit": "rad/s"
+                                    },
+                                    {
+                                        "color": "#ffb172",
+                                        "fieldId": 5,
+                                        "fieldName": "dtheta2",
+                                        "max": 48,
+                                        "min": -48,
+                                        "name": "θ'₂",
+                                        "style": "dashed",
+                                        "unit": "rad/s"
+                                    }
+                                ],
+                                "sourceId": "0x9E226FAC",
+                                "topicId": "0x0102",
+                                "topicName": "sensores",
+                                "view": {
+                                    "fillArea": false,
+                                    "gaugeShape": "arc",
+                                    "gridPoints": false,
+                                    "hoverCrosshair": false,
+                                    "info": false,
+                                    "infoItems": [
+                                    ],
+                                    "interpolation": "zoh",
+                                    "lastValue": true,
+                                    "legend": "topRight",
+                                    "legendOpacity": 75,
+                                    "lineWidth": 0,
+                                    "markers": false,
+                                    "scaleLabels": false,
+                                    "style": "app",
+                                    "xAxisTitle": false,
+                                    "xTickLabels": false,
+                                    "yAxisTitle": true,
+                                    "yTickLabels": true,
+                                    "yTicks": 5
+                                },
+                                "xAxis": {
+                                    "limit": 5,
+                                    "mode": "time",
+                                    "sampleTimeMs": 8
+                                },
+                                "yAxis": {
+                                    "autoAxis": true,
+                                    "decimals": 2,
+                                    "grid": true,
+                                    "max": 100,
+                                    "min": 0,
+                                    "mode": "auto",
+                                    "unit": "angle [rad]"
+                                }
+                            },
+                            "groupId": "",
+                            "id": "d40748d6-54b6-4e39-8f86-aba1780cbb38",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.65,
+                                    "width": 0.36666666666666664,
+                                    "x": 0.6333333333333333,
+                                    "y": 0
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0,
+                                    "y": 0.3333333333333333
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0
+                                }
+                            },
+                            "name": "angles",
+                            "type": "dummy_line"
+                        },
+                        {
+                            "config": {
+                                "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                "series": [
+                                    {
+                                        "color": "#2e6fe0",
+                                        "fieldId": 10,
+                                        "fieldName": "t_calc",
+                                        "max": 24,
+                                        "min": 0,
+                                        "name": "Tc",
+                                        "style": "solid",
+                                        "unit": "ms"
+                                    },
+                                    {
+                                        "color": "#0a0f1e",
+                                        "fieldId": 8,
+                                        "fieldName": "n_qp",
+                                        "max": 12,
+                                        "min": 0,
+                                        "name": "n_QP",
+                                        "style": "solid",
+                                        "unit": ""
+                                    }
+                                ],
+                                "sourceId": "0x9E226FAC",
+                                "topicId": "0x0101",
+                                "topicName": "controle",
+                                "view": {
+                                    "fillArea": false,
+                                    "gaugeShape": "arc",
+                                    "gridPoints": false,
+                                    "hoverCrosshair": false,
+                                    "info": true,
+                                    "infoItems": [
+                                        "min",
+                                        "max",
+                                        "median"
+                                    ],
+                                    "interpolation": "zoh",
+                                    "lastValue": true,
+                                    "legend": "hidden",
+                                    "legendOpacity": 75,
+                                    "lineWidth": 1,
+                                    "markers": true,
+                                    "scaleLabels": false,
+                                    "style": "app",
+                                    "xAxisTitle": false,
+                                    "xTickLabels": false,
+                                    "yAxisTitle": true,
+                                    "yTickLabels": true,
+                                    "yTicks": 3
+                                },
+                                "xAxis": {
+                                    "limit": 30,
+                                    "mode": "time",
+                                    "sampleTimeMs": 20
+                                },
+                                "yAxis": {
+                                    "autoAxis": true,
+                                    "decimals": 2,
+                                    "grid": true,
+                                    "max": 100,
+                                    "min": 0,
+                                    "mode": "auto",
+                                    "unit": ""
+                                }
+                            },
+                            "groupId": "",
+                            "id": "4b642af9-b797-451e-a4c0-b55ea8d24e4d",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.35,
+                                    "width": 0.3416666666666667,
+                                    "x": 0.6583333333333333,
+                                    "y": 0.65
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0.5,
+                                    "y": 0.3333333333333333
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0
+                                }
+                            },
+                            "name": "process",
+                            "type": "dummy_line"
+                        },
+                        {
+                            "config": {
+                                "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                "series": [
+                                    {
+                                        "color": "#2e6fe0",
+                                        "fieldId": 6,
+                                        "fieldName": "u",
+                                        "max": 3,
+                                        "min": -3,
+                                        "name": "torque ",
+                                        "style": "solid",
+                                        "unit": "N·m"
+                                    },
+                                    {
+                                        "color": "#0a0f1e",
+                                        "fieldId": 2,
+                                        "fieldName": "theta1",
+                                        "max": 2.16,
+                                        "min": -2.16,
+                                        "name": "acceleration",
+                                        "style": "solid",
+                                        "unit": "rad"
+                                    }
+                                ],
+                                "sourceId": "0x9E226FAC",
+                                "topicId": "0x0101",
+                                "topicName": "controle",
+                                "view": {
+                                    "fillArea": false,
+                                    "gaugeShape": "arc",
+                                    "gridPoints": false,
+                                    "hoverCrosshair": false,
+                                    "info": false,
+                                    "infoItems": [
+                                        "rate",
+                                        "samples",
+                                        "span"
+                                    ],
+                                    "interpolation": "linear",
+                                    "lastValue": true,
+                                    "legend": "topLeft",
+                                    "legendOpacity": 75,
+                                    "lineWidth": 0,
+                                    "markers": false,
+                                    "scaleLabels": false,
+                                    "style": "app",
+                                    "xAxisTitle": false,
+                                    "xTickLabels": false,
+                                    "yAxisTitle": true,
+                                    "yTickLabels": true,
+                                    "yTicks": 5
+                                },
+                                "xAxis": {
+                                    "limit": 5,
+                                    "mode": "time",
+                                    "sampleTimeMs": 10
+                                },
+                                "yAxis": {
+                                    "autoAxis": true,
+                                    "decimals": 2,
+                                    "grid": true,
+                                    "max": 100,
+                                    "min": 0,
+                                    "mode": "auto",
+                                    "unit": ""
+                                }
+                            },
+                            "groupId": "",
+                            "id": "c44b9c3b-3033-44af-b6bd-f60963666a8d",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.65,
+                                    "width": 0.36666666666666664,
+                                    "x": 0.26666666666666666,
+                                    "y": 0
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0,
+                                    "y": 0.6666666666666666
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0
+                                }
+                            },
+                            "name": "control",
+                            "type": "dummy_line"
+                        },
+                        {
+                            "config": {
+                                "bind": {
+                                    "theta1": {
+                                        "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                        "fieldId": 1,
+                                        "fieldName": "theta1",
+                                        "sourceId": "0x9E226FAC",
+                                        "topicId": "0x0102",
+                                        "topicName": "sensores"
+                                    },
+                                    "theta2": {
+                                        "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                        "fieldId": 2,
+                                        "fieldName": "theta2",
+                                        "sourceId": "0x9E226FAC",
+                                        "topicId": "0x0102",
+                                        "topicName": "sensores"
+                                    }
+                                },
+                                "params": {
+                                    "antialiasing": 1,
+                                    "arm_length_m": 0.085,
+                                    "azimuth_deg": -45,
+                                    "backdrop": 0,
+                                    "elevation_deg": 45,
+                                    "labels": 0,
+                                    "pendulum_length_m": 0.12000000000000001,
+                                    "shadows": 0,
+                                    "trail": 1
+                                },
+                                "scene": "furuta"
+                            },
+                            "groupId": "",
+                            "id": "c7d20e3e-b641-4110-8d78-ae5d38771032",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.65,
+                                    "width": 0.26666666666666666,
+                                    "x": 0,
+                                    "y": 0
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0.5,
+                                    "y": 0.6666666666666666
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0
+                                }
+                            },
+                            "name": "Furuta Pendulum",
+                            "type": "scene"
+                        },
+                        {
+                            "config": {
+                                "confirmBeforeSend": false,
+                                "debounceMs": 150,
+                                "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                "label": "home",
+                                "longPress": {
+                                    "command": "",
+                                    "enabled": false,
+                                    "thresholdMs": 600
+                                },
+                                "mode": "pulse",
+                                "onPress": "furuta -home",
+                                "onRelease": "",
+                                "repeatIntervalMs": 200,
+                                "repeatWhileHeld": false,
+                                "variant": "default"
+                            },
+                            "groupId": "",
+                            "id": "b3943492-6228-47c9-8823-41b32c88849c",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.075,
+                                    "width": 0.08333333333333333,
+                                    "x": 0.008333333333333333,
+                                    "y": 0.1125
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0,
+                                    "y": 0
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0
+                                }
+                            },
+                            "name": "home",
+                            "type": "push_button"
+                        },
+                        {
+                            "config": {
+                                "confirmBeforeSend": false,
+                                "debounceMs": 150,
+                                "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                "label": "start",
+                                "longPress": {
+                                    "command": "",
+                                    "enabled": false,
+                                    "thresholdMs": 600
+                                },
+                                "mode": "pulse",
+                                "onPress": "furuta -start",
+                                "onRelease": "",
+                                "repeatIntervalMs": 200,
+                                "repeatWhileHeld": false,
+                                "variant": "success"
+                            },
+                            "groupId": "",
+                            "id": "86afeddb-098b-40b6-b404-699744e2aa21",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.075,
+                                    "width": 0.08333333333333333,
+                                    "x": 0.008333333333333333,
+                                    "y": 0.175
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0,
+                                    "y": 0
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0
+                                }
+                            },
+                            "name": "start",
+                            "type": "push_button"
+                        },
+                        {
+                            "config": {
+                                "confirmBeforeSend": false,
+                                "debounceMs": 150,
+                                "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                "label": "stop",
+                                "longPress": {
+                                    "command": "",
+                                    "enabled": false,
+                                    "thresholdMs": 600
+                                },
+                                "mode": "pulse",
+                                "onPress": "furuta -stop",
+                                "onRelease": "",
+                                "repeatIntervalMs": 200,
+                                "repeatWhileHeld": false,
+                                "variant": "danger"
+                            },
+                            "groupId": "",
+                            "id": "cfa02d8b-0341-478a-bd53-f5488526e675",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.075,
+                                    "width": 0.08333333333333333,
+                                    "x": 0.008333333333333333,
+                                    "y": 0.2375
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0,
+                                    "y": 0
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0
+                                }
+                            },
+                            "name": "stop",
+                            "type": "push_button"
+                        },
+                        {
+                            "config": {
+                                "confirmBeforeSend": true,
+                                "debounceMs": 150,
+                                "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                "label": "auto",
+                                "longPress": {
+                                    "command": "",
+                                    "enabled": false,
+                                    "thresholdMs": 600
+                                },
+                                "mode": "pulse",
+                                "onPress": "furuta -auto",
+                                "onRelease": "",
+                                "repeatIntervalMs": 200,
+                                "repeatWhileHeld": false,
+                                "variant": "default"
+                            },
+                            "groupId": "",
+                            "id": "14cc7f6e-3b4e-41f0-a42e-a4f47eee8996",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.075,
+                                    "width": 0.08333333333333333,
+                                    "x": 0.008333333333333333,
+                                    "y": 0.3
+                                },
+                                "medium": {
+                                    "height": 0.1,
+                                    "width": 0.25,
+                                    "x": 0.5,
+                                    "y": 0
+                                },
+                                "small": {
+                                    "height": 0.1,
+                                    "width": 0.3333333333333333,
+                                    "x": 0,
+                                    "y": 0.35
+                                }
+                            },
+                            "name": "auto",
+                            "type": "push_button"
+                        },
+                        {
+                            "config": {
+                                "confirmBeforeSend": false,
+                                "debounceMs": 150,
+                                "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                "label": "zera",
+                                "longPress": {
+                                    "command": "",
+                                    "enabled": false,
+                                    "thresholdMs": 600
+                                },
+                                "mode": "pulse",
+                                "onPress": "furuta -zera",
+                                "onRelease": "",
+                                "repeatIntervalMs": 200,
+                                "repeatWhileHeld": false,
+                                "variant": "default"
+                            },
+                            "groupId": "",
+                            "id": "040a9404-6492-44b4-8b08-127d616675b6",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.075,
+                                    "width": 0.08333333333333333,
+                                    "x": 0.008333333333333333,
+                                    "y": 0.05
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0,
+                                    "y": 0
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0
+                                }
+                            },
+                            "name": "zera",
+                            "type": "push_button"
+                        },
+                        {
+                            "config": {
+                                "deviceId": "a6156cda-698c-4e4b-87d2-efa380471f60",
+                                "series": [
+                                    {
+                                        "color": "#2e6fe0",
+                                        "fieldId": 1,
+                                        "fieldName": "driver",
+                                        "max": 120,
+                                        "min": 0,
+                                        "name": "driver_temp",
+                                        "style": "solid",
+                                        "unit": "°C"
+                                    }
+                                ],
+                                "sourceId": "0x9E226FAC",
+                                "topicId": "0x0103",
+                                "topicName": "temperatura",
+                                "view": {
+                                    "fillArea": false,
+                                    "gaugeShape": "arc",
+                                    "gridPoints": false,
+                                    "hoverCrosshair": false,
+                                    "info": true,
+                                    "infoItems": [
+                                        "max"
+                                    ],
+                                    "interpolation": "linear",
+                                    "lastValue": true,
+                                    "legend": "topLeft",
+                                    "legendOpacity": 75,
+                                    "lineWidth": 0,
+                                    "markers": false,
+                                    "scaleLabels": false,
+                                    "style": "app",
+                                    "xAxisTitle": false,
+                                    "xTickLabels": false,
+                                    "yAxisTitle": true,
+                                    "yTickLabels": true,
+                                    "yTicks": 5
+                                },
+                                "xAxis": {
+                                    "limit": 30,
+                                    "mode": "time",
+                                    "sampleTimeMs": 20
+                                },
+                                "yAxis": {
+                                    "autoAxis": true,
+                                    "decimals": 0,
+                                    "grid": true,
+                                    "max": 100,
+                                    "min": 0,
+                                    "mode": "auto",
+                                    "unit": ""
+                                }
+                            },
+                            "groupId": "",
+                            "id": "1cab64eb-cd58-4873-a4e6-f5e65ce1610f",
+                            "key": "",
+                            "layouts": {
+                                "large": {
+                                    "height": 0.35,
+                                    "width": 0.1416666666666666,
+                                    "x": 0.5166666666666667,
+                                    "y": 0.65
+                                },
+                                "medium": {
+                                    "height": 0.3333333333333333,
+                                    "width": 0.5,
+                                    "x": 0,
+                                    "y": 0
+                                },
+                                "small": {
+                                    "height": 0.35,
+                                    "width": 1,
+                                    "x": 0,
+                                    "y": 0.45
+                                }
+                            },
+                            "name": "driver temp",
+                            "type": "dummy_line"
+                        }
+                    ],
+                    "verticalUnit": "page"
+                },
+                "id": "f47391f8-7e34-4850-adca-95d99b117af3",
+                "name": "Default"
+            }
+        ]
+    }
+}

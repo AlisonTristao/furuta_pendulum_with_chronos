@@ -56,9 +56,8 @@ static double reta(const double *t, const double *y, int n, double *a, double *b
 
 /* Centro da oscilação a partir de i0 (ver o cabeçalho). Extremos: o maior |φ − c0| entre dois cruzamentos de c0,
  * com refinamento por parábola nos 3 pontos em volta. Duas passadas: c0 = média, depois c0 = o centro achado. */
-static const char *centro(int i0, int n, double *c, int *ntrincas)
+static const char *centro(const float *phi, int i0, int n, double *c, int *ntrincas)
 {
-    const float *phi = s_phi;
     double c0 = 0;
     for (int i = i0; i < n; i++) c0 += phi[i];
     c0 /= (n - i0);
@@ -198,7 +197,7 @@ static const char *zera_pelo_centro(int n, int isolto)
 {
     double c;
     int k;
-    const char *e = centro(isolto, n, &c, &k);
+    const char *e = centro(s_phi, isolto, n, &c, &k);
     if (e) return e;
     controle_desloca_pendulo((float)-c);
     for (int i = 0; i < n; i++) s_phi[i] -= (float)c;
@@ -206,6 +205,11 @@ static const char *zera_pelo_centro(int n, int isolto)
     saida_printf("zero do θ2 pelo centro da oscilação (%d trincas de extremos): corrigido em %+.4f rad (%+.2f°)\n", k,
                  -c, -c * 180 / PI);
     return NULL;
+}
+
+const char *ident_centro(const float *phi, int n, double *c, int *ntrincas)
+{
+    return centro(phi, 0, n, c, ntrincas);
 }
 
 const char *ident_calibra(void)
