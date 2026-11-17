@@ -8,3 +8,6 @@
 [submodule "firmware/extern/TinyShell"]
 	path = firmware/extern/TinyShell
 	url = https://github.com/AlisonTristao/TinyShell.git
+[submodule "firmware/extern/acados"]
+	path = firmware/extern/acados
+	url = https://github.com/acados/acados.git
