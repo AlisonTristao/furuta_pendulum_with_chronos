@@ -26,7 +26,8 @@ int controlador_cria(controlador *k, const config *cfg, const double x0[4])
     if (!e->equilibrio && e->lado < 0) k->off2 += 2 * PI_D;
     k->trim = e->trim_valor;                      /* offset do topo: vale sempre; trim.liga só decide se aprende */
     k->t_dentro = 0;
-    double x[4] = {x0[0], x0[1] - k->off2 - k->trim - controlador_inclinacao(e, x0[0]), x0[2], x0[3]};
+    double trim0 = e->trim_rampa > 0 && !e->equilibrio ? 0.0 : k->trim;   /* na subida o offset entra depois */
+    double x[4] = {x0[0], x0[1] - k->off2 - trim0 - controlador_inclinacao(e, x0[0]), x0[2], x0[3]};
     k->c = mpc_cria(&k->cfg.mpc, &k->m, x, 0.0);
     if (!k->c) return -1;
     estimador_cria(&k->est, e->est_L1, e->est_L2);
@@ -34,7 +35,7 @@ int controlador_cria(controlador *k, const config *cfg, const double x0[4])
     k->u = 0;
     k->imp_ativo = !e->equilibrio && e->impulso_ms > 0;
     k->imp_t = 0, k->imp_e = 0;
-    k->capturou = 0, k->rerefs = 0;
+    k->capturou = 0, k->rerefs = 0, k->subiu = 0, k->t_subiu = 0;
     k->repousando = 0, k->n_repouso = 0;
     for (int i = 0; i < 4; i++) k->imp_x[i] = 0;
     return 0;
@@ -60,10 +61,22 @@ static void trim_passo(controlador *k, const double x[4], double u, int finito)
     if (k->trim < -e->trim_max) k->trim = -e->trim_max;
 }
 
+/* Fração do offset do topo em uso (trim.rampa): 0 até a 1ª captura, rampa linear em trim_rampa segundos, depois 1.
+ * Lote 15/11: com o offset (+1,4°) desde a partida, o −π chegava ao topo mas caía logo depois (0/7 limpas, +π 6/6);
+ * sem ele os dois lados capturavam, mas o braço parava em θ1 ≈ −0,8 (o offset é o que centra o equilíbrio). */
+static double fracao_trim(const controlador *k, double t)
+{
+    const ensaio *e = &k->cfg.e;
+    if (e->trim_rampa <= 0 || e->equilibrio) return 1.0;
+    if (!k->subiu) return 0.0;
+    double f = (t - k->t_subiu) / e->trim_rampa;
+    return f < 0 ? 0.0 : f > 1 ? 1.0 : f;
+}
+
 double controlador_passo(controlador *k, double x[4], double t, mpc_info *in)
 {
     const ensaio *e = &k->cfg.e;
-    x[1] -= k->off2 + k->trim + controlador_inclinacao(e, x[0]);
+    x[1] -= k->off2 + k->trim * fracao_trim(k, t) + controlador_inclinacao(e, x[0]);
     /* re-referência (controlador.h): caindo (θ2·dθ2 > 0, com o dθ2 do estimador do passo anterior) além de
      * reref_angulo. O estimador pula junto, senão vira um pico de velocidade. */
     if (e->reref && k->capturou && !k->imp_ativo) {
@@ -88,6 +101,10 @@ double controlador_passo(controlador *k, double x[4], double t, mpc_info *in)
     if (e->banda_th2 > 0 && e->banda_dth2 > 0 && k->capturou && fabs(xc[1]) < e->banda_th2 &&
         fabs(xc[3]) < e->banda_dth2 && (e->banda_dth1 <= 0 || fabs(xc[2]) < e->banda_dth1))
         xc[1] = 0, xc[3] = 0;
+    /* viés da subida (ensaio.subida_vies): até capturar o topo o alvo do θ2 fica lado·vies, em vez de 0. Antes do
+     * offset do topo ser corrigido (14/11), o MPC mirava 1,4° além do topo pelo lado +π e subia de primeira por esse
+     * lado: chegava com uma folga de energia. Depois de capturar, o alvo volta a 0 (equilíbrio e repouso exatos). */
+    if (e->subida_vies != 0 && !k->subiu && !e->equilibrio) xc[1] -= (e->lado < 0 ? -1 : 1) * e->subida_vies;
     double ref[4] = {t >= e->t_degrau ? e->theta1_degrau : e->theta1_ref, 0, 0, 0};
     double u = mpc_passo(k->c, xc, ref, in);
     double a = in->finito ? modelo_acel_braco(&k->m, xc, u) : 0.0;
@@ -110,7 +127,10 @@ double controlador_passo(controlador *k, double x[4], double t, mpc_info *in)
             u = 0;
         }
     }
-    if (!k->capturou && fabs(x[1]) < e->janela_equilibrio && fabs(x[3]) < 2.0) k->capturou = 1;
+    if (!k->capturou && fabs(x[1]) < e->janela_equilibrio && fabs(x[3]) < 2.0) {
+        if (!k->subiu) k->t_subiu = t;
+        k->capturou = k->subiu = 1;
+    }
     /* modo repouso (controlador.h) */
     if (e->repouso && k->capturou && !k->imp_ativo && e->banda_th2 > 0 && e->banda_dth2 > 0) {
         if (k->repousando)

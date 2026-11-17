@@ -23,6 +23,8 @@ extern const char furuta_ini[];               // pc/furuta.ini embutido (furuta_
 void bench_roda(const config *cfg);           // bench.c
 
 static config s_cfg;                        // configuração em uso (cfg -set), copiada no início do ensaio
+static ensaio_resultado s_ultimo;           // resultado do último ensaio de controle (furuta -lote)
+static portMUX_TYPE s_mux_res = portMUX_INITIALIZER_UNLOCKED;
 static TaskHandle_t s_tarefa_mpc;
 static QueueHandle_t s_fila_tel;
 static volatile int s_pedido = 0;           // 0 = nada, 1 = controle, 2 = a seco, 3 = bench, 4 = sim, -1 = desliga
@@ -79,14 +81,14 @@ static int resumo(const config *c, char *buf, int n)
                     "mpc: Np=%d horizonte=%.3f discretizacao=%s Q=%g,%g,%g,%g Rdu=%g u=[%.3f,%.3f] peso_exp=%.2f "
                     "l_max=%d theta1=[%.3f,%.3f]\n"
                     "fisico: L1=%.4f l2=%.4f m2=%.5f I2=%.4e mu2=%.4e\n"
-                    "ensaio: Ts=%.3f duracao=%.1f modo=%s lado=%d lado_auto=%d comp_atraso_ms=%.0f impulso=%.0f/%.0f estimador=%d\n"
-                    "trim: liga=%d tau=%.1f max=%.3f janela=%.3f valor=%+.4f\n"
+                    "ensaio: Ts=%.3f duracao=%.1f modo=%s lado=%d lado_auto=%d vies=%+.4f comp_atraso_ms=%.0f impulso=%.0f/%.0f estimador=%d\n"
+                    "trim: liga=%d tau=%.1f max=%.3f janela=%.3f valor=%+.4f rampa=%.1f\n"
                     "inclinacao: pontos=%d grava=%.1f amplitude=%.2f ciclos=%d seno=%+.4f cosseno=%+.4f",
                     m->Np, (double)m->horizonte, modelo_disc_nome(m->discretizacao), (double)m->Q[0], (double)m->Q[1], (double)m->Q[2], (double)m->Q[3],
                     (double)m->Rdu, (double)m->u_min, (double)m->u_max, (double)m->peso_exp, m->l_max,
                     (double)m->theta1_min, (double)m->theta1_max, c->f.L1, c->f.l2, c->f.m2, c->f.I2, c->f.mu2, e->Ts,
-                    e->duracao, e->equilibrio ? "equilibrio" : "swingup", e->lado, e->lado_auto, e->comp_atraso_ms, e->impulso_a,
-                    e->impulso_ms, e->estimador, e->trim, e->trim_tau, e->trim_max, e->trim_janela, e->trim_valor,
+                    e->duracao, e->equilibrio ? "equilibrio" : "swingup", e->lado, e->lado_auto, e->subida_vies, e->comp_atraso_ms, e->impulso_a,
+                    e->impulso_ms, e->estimador, e->trim, e->trim_tau, e->trim_max, e->trim_janela, e->trim_valor, e->trim_rampa,
                     e->incl_pontos, e->incl_grava, e->incl_amplitude, e->incl_ciclos, e->incl_seno, e->incl_cosseno);
 }
 
@@ -133,6 +135,20 @@ int embarcado_lado_auto(void)
 }
 
 double embarcado_offset_topo(void) { return s_cfg.e.trim_valor; }
+
+bool embarcado_ultimo_resultado(ensaio_resultado *r)
+{
+    taskENTER_CRITICAL(&s_mux_res);
+    *r = s_ultimo;
+    taskEXIT_CRITICAL(&s_mux_res);
+    return r->valido;
+}
+
+void embarcado_ensaio_atual(int *lado, double *duracao)
+{
+    *lado = s_cfg.e.lado;
+    *duracao = s_cfg.e.duracao;
+}
 
 bool embarcado_ativo(void) { return s_ativo; }
 fase_t embarcado_fase(void) { return s_fase; }
@@ -194,6 +210,7 @@ static const char *roda_ensaio(int modo)
     double eq_t1 = 0, eq_t1_min = 1e9, eq_t1_max = -1e9, eq_th2q = 0;
     int eq_n = 0, eq_quedas = 0;
     double t_topo = -1;                           // 1ª vez com |θ2| < 0,15 rad (a subida) [s]
+    double temp_ini = NAN;                        // driver na partida [°C]
     bool solto = false;                           // motor solto no repouso (ensaio.repouso_solta)
     int n_soltas = 0;
     double zero_rep = NAN;                        // repouso − zero em uso no start [rad]
@@ -252,6 +269,10 @@ static const char *roda_ensaio(int modo)
                 parte = t_espera - t_quieto > 1.0;
                 if (parte) {
                     double desloc = PI_D + controlador_inclinacao(e, x[0]) - soma_th2 / n_th2;
+                    // sem as voltas inteiras: depois de uma queda que deu a volta o θ2 contínuo acumula ±2π, e a
+                    // diferença de "−360°" descartava o zero da oscilação a cada rodada (lote 15/11: zero do repouso,
+                    // ±1°, em quase todas as subidas)
+                    desloc -= 2 * PI_D * floor(desloc / (2 * PI_D) + 0.5);
                     zero_rep = -desloc;
                     zero_osc = s_zero_calibrado && fabs(desloc) < ZERO_TOLERA;
                     if (s_zero_calibrado && fabs(desloc) < ZERO_TOLERA) {   // a oscilação é melhor que o repouso
@@ -283,6 +304,7 @@ static const char *roda_ensaio(int modo)
             int perdidas = (int)ulTaskNotifyTake(pdTRUE, 0);                 // amostras perdidas na criação
             char txt[512];
             resumo(&cfg, txt, sizeof(txt));       // o que está sendo usado de fato (θ1 do homing)
+            temp_ini = termopar_temp();
             saida_aviso("%s ligado (%d amostras na criação), driver %.1f °C\n%s", modo == 1 ? "controle" : "a seco",
                         perdidas, (double)termopar_temp(), txt);
             continue;                             // a amostra já ficou velha: começa na próxima
@@ -355,6 +377,13 @@ static const char *roda_ensaio(int modo)
                     sqrt(eq_th2q / eq_n) * 180 / PI_D, eq_quedas, rerefs, t_repouso, n_soltas, (double)termopar_temp());
     else if (criado)
         saida_aviso("equilíbrio: não chegou no topo");
+    if (modo == 1) {
+        ensaio_resultado r = {true, e->lado, criado, t_topo, eq_quedas, k ? 100 * eq_n / k : 0, k * e->Ts,
+                              temp_ini, (double)termopar_temp(), motivo};
+        taskENTER_CRITICAL(&s_mux_res);
+        s_ultimo = r;
+        taskEXIT_CRITICAL(&s_mux_res);
+    }
     saida_aviso("fim do ensaio: %s (%.1f s, %u estouros)%s", motivo, k * e->Ts, estouros,
                 desligou ? "; driver desligado (braço solto: refaça o homing)" : "");
     return motivo;

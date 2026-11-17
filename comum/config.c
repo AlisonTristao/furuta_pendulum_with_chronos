@@ -29,6 +29,7 @@ static void padroes(config *c)
     e.lado = 1;
     e.impulso_a = 80;
     e.impulso_ms = 200;
+    e.subida_vies = 0;
     e.reref = 0;
     e.reref_angulo = 0.26;
     e.banda_th2 = 0.02;
@@ -41,6 +42,7 @@ static void padroes(config *c)
     e.trim_tau = 8;
     e.trim_max = 0.06;
     e.trim_janela = 0.15;
+    e.trim_rampa = 2;
     e.incl_pontos = 7;
     e.incl_grava = 5;
     e.incl_amplitude = 1.0;
@@ -121,6 +123,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
     INT("ensaio", "estimador", c->e.estimador) NUM("ensaio", "est_L1", c->e.est_L1) NUM("ensaio", "est_L2", c->e.est_L2)
     NUM("ensaio", "comp_atraso_ms", c->e.comp_atraso_ms) INT("ensaio", "embarcado", c->e.embarcado)
     INT("ensaio", "lado", c->e.lado) INT("ensaio", "lado_auto", c->e.lado_auto) NUM("ensaio", "impulso_a", c->e.impulso_a) NUM("ensaio", "impulso_ms", c->e.impulso_ms)
+    NUM("ensaio", "subida_vies", c->e.subida_vies)
     INT("ensaio", "reref", c->e.reref) NUM("ensaio", "reref_angulo", c->e.reref_angulo)
     NUM("ensaio", "banda_th2", c->e.banda_th2) NUM("ensaio", "banda_dth2", c->e.banda_dth2)
     NUM("ensaio", "banda_dth1", c->e.banda_dth1)
@@ -138,6 +141,7 @@ static int aplica(config *c, const char *sec, const char *k, const char *v)
 
     INT("trim", "liga", c->e.trim) NUM("trim", "tau", c->e.trim_tau) NUM("trim", "max", c->e.trim_max)
     NUM("trim", "janela", c->e.trim_janela) NUM("trim", "valor", c->e.trim_valor)
+    NUM("trim", "rampa", c->e.trim_rampa)
 
     INT("inclinacao", "pontos", c->e.incl_pontos) NUM("inclinacao", "grava", c->e.incl_grava)
     NUM("inclinacao", "amplitude", c->e.incl_amplitude)

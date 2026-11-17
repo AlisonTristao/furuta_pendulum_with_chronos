@@ -37,6 +37,8 @@ typedef struct {
     int lado;                                     /* swing-up: θ2 inicial +π (1) ou −π (−1, espelho: impulso invertido) */
     int lado_auto;                                /* furuta -auto: lado = lado_auto·sinal(trim.valor); 0 sorteia */
     double impulso_a, impulso_ms;                 /* impulso inicial (controlador.c): +a na 1ª metade, -a na 2ª [rad/s², ms] */
+    double subida_vies;                           /* swing-up: até capturar o topo o MPC mira θ2 = lado·subida_vies [rad]
+                                                     (> 0: antes do topo, do lado por onde chega; < 0: passando dele) */
     int reref;                                    /* 1: depois de uma queda, o alvo pula para o topo à frente (±2π) */
     double reref_angulo;                          /* |θ2| a partir do topo, caindo, em que pula [rad] */
     double banda_th2, banda_dth2;                 /* banda morta no equilíbrio: com |θ2| < banda_th2 [rad] e |dθ2| <
@@ -57,6 +59,8 @@ typedef struct {
     double trim_max;                              /* |trim| máximo [rad] */
     double trim_janela;                           /* só aprende com |θ2| abaixo disso [rad] */
     double trim_valor;                            /* trim inicial [rad]; o firmware guarda aqui o aprendido */
+    double trim_rampa;                            /* > 0: o offset do topo é 0 na subida e entra em rampa durante
+                                                     trim_rampa segundos depois da 1ª captura; 0: vale desde a partida */
     /* inclinação da mesa (seção [inclinacao]): o topo verdadeiro fica em θ2 = seno·sin θ1 + cosseno·(cos θ1 − 1)
      * (controlador_inclinacao). O firmware mede com a varredura do furuta -inclina (inclina.c) */
     int incl_pontos;                              /* posições do braço na varredura (0: o -auto não varre) */

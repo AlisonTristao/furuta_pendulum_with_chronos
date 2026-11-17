@@ -99,11 +99,15 @@ public:
             .add("auto", [] { return automatico(); },
                  "furuta -auto: zera (pêndulo parado embaixo), homing, zero pela oscilação (inclinacao.pontos), lado "
                  "do swing-up pelo sinal do offset do topo (ensaio.lado_auto) e start")
+            .add("lote", [](uint8_t n, uint8_t dur) { return lote(n, dur); },
+                 "furuta -lote <n>, <s>: n subidas de s segundos alternando o lado (+π, −π, ...); no log, uma linha por "
+                 "subida e o resumo por lado. -stop interrompe")
             .add("inclina", [] { return inclina(true); },
                  "furuta -inclina: varre o braço e mede a inclinação da mesa, gravada na flash (após o homing, pêndulo "
                  "pendurado; ~1 min: deixe o motor esfriar antes do start)")
             .add("dry", [] { return liga(2); }, "furuta -dry: a seco (calcula com os sensores, sem motor)")
             .add("stop", [] {
+                s_lote_aborta = true;
                 embarcado_desliga();
                 return uint8_t{RESULT_OK};
             }, "furuta -stop: para o ensaio")
@@ -303,11 +307,10 @@ private:
     // >= 4 = varredura da mesa), lado do swing-up e start. O lado vem do sinal do offset do topo (ensaio.lado_auto ·
     // sinal(trim.valor)); com lado_auto = 0 ou offset zero, é sorteado (esp_random: RNG de hardware). Fica na config
     // em uso, como um cfg -set ensaio.lado: o cfg -show mostra o escolhido.
-    static uint8_t automatico() {
-        if (embarcado_ativo()) return err("tem um ensaio rodando");
-        // o zera é uma leitura só: espera o pêndulo parar (θ2 variando menos de 0,01 rad por 1 s, até 20 s), senão
-        // logo depois de um -stop ele pega o pêndulo balançando (14/11: ±6,8°). Pela posição e não pelo dθ2: parado
-        // na divisa entre duas contagens do encoder, a leitura alterna 1 LSB e o observador dá picos de ~0,8 rad/s
+    // O zera é uma leitura só: espera o pêndulo parar (θ2 variando menos de 0,01 rad por 1 s, até 20 s), senão
+    // logo depois de um -stop ele pega o pêndulo balançando (14/11: ±6,8°). Pela posição e não pelo dθ2: parado
+    // na divisa entre duas contagens do encoder, a leitura alterna 1 LSB e o observador dá picos de ~0,8 rad/s.
+    static void espera_e_zera(const char* quem) {
         int quieto_ms = 0, espera_ms = 0;
         float th_min = 0, th_max = 0;
         for (; quieto_ms < 1000 && espera_ms < 20000; espera_ms += 20) {
@@ -319,8 +322,13 @@ private:
             vTaskDelay(pdMS_TO_TICKS(20));
         }
         controle_zera_pendulo();
-        saida_aviso("-auto: θ2 = π (pêndulo %s embaixo, %.1f s esperando); homing...",
+        saida_aviso("%s: θ2 = π (pêndulo %s embaixo, %.1f s esperando); homing...", quem,
                     quieto_ms >= 1000 ? "parado" : "AINDA BALANÇANDO", espera_ms * 1e-3);
+    }
+
+    static uint8_t automatico() {
+        if (embarcado_ativo()) return err("tem um ensaio rodando");
+        espera_e_zera("-auto");
         if (home() != RESULT_OK) return RESULT_ERROR;   // home() já imprimiu o motivo
         inclinacao_params ip;
         embarcado_inclinacao_params(&ip);
@@ -334,6 +342,81 @@ private:
                     lado > 0 ? "+π" : "−π", sorteado ? "sorteado" : "pelo sinal do offset (ensaio.lado_auto)", off,
                     off * 180 / 3.14159265358979);
         return liga(1);
+    }
+
+    // furuta -lote: série de subidas alternando o lado, numa tarefa própria (a do shell fica livre para o -stop).
+    // Uma vez: espera parar, zera, homing e o zero pela oscilação (inclinacao.pontos). Cada rodada: homing (o driver
+    // desliga no fim de cada ensaio) e o ensaio, que só parte com o pêndulo parado embaixo: no fim da duração ele
+    // cai e a rodada seguinte espera estabilizar. Restaura ensaio.lado e ensaio.duracao no fim.
+    static inline volatile bool s_lote_ativo = false, s_lote_aborta = false;
+    static inline int s_lote_n = 0, s_lote_dur = 0;
+
+    static uint8_t lote(uint8_t n, uint8_t dur) {
+        if (embarcado_ativo() || s_lote_ativo) return err("tem um ensaio ou lote rodando");
+        if (n < 1 || n > 40) return err("n entre 1 e 40");
+        if (dur < 5 || dur > 60) return err("duração entre 5 e 60 s");
+        s_lote_n = n;
+        s_lote_dur = dur;
+        s_lote_aborta = false;
+        s_lote_ativo = true;
+        if (xTaskCreatePinnedToCore(tarefa_lote, "lote", 6144, nullptr, 5, nullptr, 0) != pdPASS) {
+            s_lote_ativo = false;
+            return err("não deu para criar a tarefa do lote");
+        }
+        btpdev::printf("lote: %d subidas de %d s alternando o lado; acompanhe no log (-stop interrompe)\n", n, dur);
+        return RESULT_OK;
+    }
+
+    static void tarefa_lote(void*) {
+        int lado0;
+        double dur0;
+        embarcado_ensaio_atual(&lado0, &dur0);
+        char par[40];
+        snprintf(par, sizeof(par), "ensaio.duracao=%d", s_lote_dur);
+        embarcado_config(par);
+        const int n = s_lote_n;
+        int feitas[2] = {0, 0}, limpas[2] = {0, 0}, quedas[2] = {0, 0}, subiram[2] = {0, 0};
+        double soma_topo[2] = {0, 0};
+        espera_e_zera("lote");
+        bool ok = home() == RESULT_OK;
+        inclinacao_params ip;
+        embarcado_inclinacao_params(&ip);
+        if (ok && ip.pontos > 0) ok = inclina(false) == RESULT_OK;
+        for (int i = 0; ok && i < n && !s_lote_aborta; i++) {
+            const int lado = (i % 2 == 0) ? 1 : -1;
+            embarcado_config(lado > 0 ? "ensaio.lado=1" : "ensaio.lado=-1");
+            if (i > 0 && home() != RESULT_OK) break;
+            if (s_lote_aborta) break;
+            saida_aviso("lote %d/%d: sobe por %s", i + 1, n, lado > 0 ? "+π" : "−π");
+            if (embarcado_liga(1)) break;
+            for (int w = 0; w < 50 && !embarcado_ativo(); w++) vTaskDelay(pdMS_TO_TICKS(20));
+            while (embarcado_ativo()) {
+                if (s_lote_aborta) embarcado_desliga();
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+            ensaio_resultado r;
+            if (!embarcado_ultimo_resultado(&r)) continue;
+            const int j = lado > 0 ? 0 : 1;
+            feitas[j]++;
+            quedas[j] += r.quedas;
+            if (r.t_topo >= 0) subiram[j]++, soma_topo[j] += r.t_topo;
+            const bool limpa = r.t_topo >= 0 && r.t_topo < 1.0 && r.quedas == 0;
+            limpas[j] += limpa;
+            saida_aviso("lote %d/%d %s: %s, topo em %.2f s, %d quedas, %d%% no topo, driver %.1f -> %.1f °C (%s)", i + 1,
+                        n, lado > 0 ? "+π" : "−π", limpa ? "LIMPA" : r.partiu ? "ruim" : "não partiu", r.t_topo,
+                        r.quedas, r.pct_topo, r.temp_ini, r.temp_fim, r.motivo);
+        }
+        for (int j = 0; j < 2; j++)
+            saida_aviso("lote, lado %s: %d/%d limpas (topo < 1 s e 0 quedas), topo médio %.2f s, %d quedas no total",
+                        j == 0 ? "+π" : "−π", limpas[j], feitas[j], subiram[j] ? soma_topo[j] / subiram[j] : -1.0,
+                        quedas[j]);
+        snprintf(par, sizeof(par), "ensaio.lado=%d", lado0);
+        embarcado_config(par);
+        snprintf(par, sizeof(par), "ensaio.duracao=%g", dur0);
+        embarcado_config(par);
+        saida_aviso("lote %s", s_lote_aborta ? "interrompido (-stop)" : "terminado");
+        s_lote_ativo = false;
+        vTaskDelete(nullptr);
     }
 
     static uint8_t set(const char* par) {

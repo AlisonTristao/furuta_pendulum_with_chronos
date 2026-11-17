@@ -37,7 +37,10 @@ typedef struct {
      * uma simulação rápida ("o braço ainda segura?") perdeu na simulação (15/11: 17,2 s contra 15,2 s em 18 quedas),
      * porque não prevê um empurrão que continua agindo. Uma vez por queda: só arma de novo quando captura o topo
      * novo. No swing-up não age (ainda não capturou). */
-    int capturou;         /* está no topo desde a última troca (|θ2| < janela_equilibrio, |dθ2| < 2 rad/s) */
+    int capturou;         /* está no topo desde a última troca (|θ2| < janela_equilibrio, |dθ2| < 2 rad/s); também
+                             zerado pela re-referência (reref) */
+    int subiu;            /* já capturou o topo uma vez neste ensaio (nunca volta a 0): desliga o viés da subida */
+    double t_subiu;       /* quando capturou pela 1ª vez [s]: início da rampa do offset (trim.rampa) */
     int rerefs;           /* quantas vezes pulou */
     /* Modo repouso (ensaio.repouso): com o controle desligado o pêndulo fica em pé sozinho, preso pelo atrito seco
      * do pivô, se estiver parado na faixa |θ2| < Tc/(m g l). No topo, com o pêndulo parado nessa faixa (|θ2| <

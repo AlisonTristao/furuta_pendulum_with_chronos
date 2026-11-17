@@ -16,6 +16,19 @@ typedef struct {
     float trim;                       // trim do zero do θ2 [rad] (controlador.h)
 } telemetria_t;
 
+// Resultado do último ensaio de controle (furuta -lote).
+typedef struct {
+    bool valido;
+    int lado;
+    bool partiu;           // o controle chegou a ligar (a condição de partida veio)
+    double t_topo;         // 1ª vez no topo [s desde a partida], < 0 se não chegou
+    int quedas;
+    int pct_topo;          // % do ensaio no topo
+    double duracao;        // quanto rodou [s]
+    double temp_ini, temp_fim;   // driver [°C]
+    const char *motivo;    // por que terminou
+} ensaio_resultado;
+
 typedef enum { FASE_PARADO, FASE_ESPERA, FASE_RODANDO, FASE_SECO, FASE_BENCH, FASE_SIM } fase_t;
 
 void embarcado_init(void);   // configuração padrão = pc/furuta.ini embutido; tarefa do MPC no núcleo 1
@@ -54,6 +67,8 @@ void embarcado_inclinacao_carrega(void);   // no boot, depois do device.begin():
 const char *embarcado_liga(int modo);
 void embarcado_desliga(void);
 bool embarcado_ativo(void);
+bool embarcado_ultimo_resultado(ensaio_resultado *r);   // false se ainda não houve ensaio de controle
+void embarcado_ensaio_atual(int *lado, double *duracao);   // ensaio.lado e ensaio.duracao em uso
 fase_t embarcado_fase(void);
 const char *embarcado_fase_nome(fase_t f);
 
